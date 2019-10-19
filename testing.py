@@ -1,11 +1,10 @@
 from framework import *
 from pebble_game import *
+from constructive_pebble_game import *
 from nose.tools import ok_
 import numpy as np
 
-# initialise the seed for reproducibility
-np.random.seed(102)
-
+# initialise the seed for reproducibility np.random.seed(102)
 
 fw_2d = create_framework([0,1,2,3], [(0,1), (0,3), (1,2), (1,3), (2,3)], [(2,3), (4,4), (5,2), (1,1)])
 # a 3d fw constricted to 2d
@@ -55,11 +54,33 @@ print(f)
 
 print(R.dot(f))
 
-rand_fw = create_random_fw(2,2,0.2)
-# draw_framework(rand_fw)
 reduced_fw = create_reduced_fw(2,2,0.2)
 
-p = pebble_game(reduced_fw, 2, 3)
-print(p[1])
-draw_framework(reduced_fw)
-draw_comps(reduced_fw, p[1])
+# p = pebble_game(reduced_fw, 2, 3)
+# print(p[1])
+# draw_framework(reduced_fw)
+# draw_comps(reduced_fw, p[1])
+# experimenting with reducing a framework gradually and tracking the number of components
+rand_fw = create_random_fw(2,2,0.2)
+num_comps = constructive_pebble_game(rand_fw, 2, 3)
+fig = plt.figure(figsize=(20,10))
+# plotting the number of comps(reversed to show removal)
+plt.plot(num_comps)
+fig.savefig("comp_numbers.pdf")
+plt.show()
+# draw_framework(rand_fw, "before.pdf")
+# num_comps = []
+# counter = 0
+# while len(rand_fw.edges) > 2*len(rand_fw.nodes):
+#         index = np.random.choice(len(rand_fw.edges))
+#         edge = list(rand_fw.edges)[index]
+#         if rand_fw.degree(edge[0]) > 2 and rand_fw.degree(edge[1]) > 2:
+#             counter += 1
+#             rand_fw.remove_edge(edge[0], edge[1])
+#             comps = pebble_game(rand_fw, 2, 3)[1]
+#             num_comps.append(len(comps))
+#             draw_comps(rand_fw, comps, filename="after"+str(counter)+".pdf", show=False)
+#             plt.close("all")
+
+# draw_comps(rand_fw, comps, "after.pdf")
+

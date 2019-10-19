@@ -53,6 +53,7 @@ def create_random_fw(w, h, r):
     fw = create_framework(nodes, edges, positions)
     return fw
 
+
 # creates a random framework and then removes edges until 
 # (still in 2D)
 def create_reduced_fw(w,h,r):
@@ -64,13 +65,15 @@ def create_reduced_fw(w,h,r):
                 fw.remove_edge(edge[0], edge[1])
     return fw
 
-def draw_framework(fw):
+def draw_framework(fw, filename=None):
     nodeview = fw.nodes
-    plt.figure(figsize=(20,10))
+    fig = plt.figure(figsize=(20,10))
     pos = {node: nodeview[node]["position"] for node in nodeview}
     nx.draw_networkx_nodes(fw, pos, with_labels=True)
     nx.draw_networkx_edges(fw, pos, with_labels=True)
     nx.draw_networkx_labels(fw,pos)
+    if filename:
+        fig.savefig(filename, bbox_inches='tight')
     plt.show()
 
 # draws the components 'comps' of the framework 'fw'
@@ -78,7 +81,7 @@ def draw_framework(fw):
 # edges in non-trivial components are solid black
 # vertices in one component are red
 # vertices in multiple components are green
-def draw_comps(fw, comps):
+def draw_comps(fw, comps, filename=None, show=True, recent_edge=None):
     big_comps = [comp for comp in comps if len(comp) > 2]  
     # calculating which vertices are in multiple components
     greens = set()
@@ -88,18 +91,29 @@ def draw_comps(fw, comps):
                 greens |= A & B
 
     # drawing the nodes of the graph
-    plt.figure(figsize=(20,10))
+    fig = plt.figure(figsize=(20,10))
     nodeview = fw.nodes
     reds = set(nodeview) - greens
     pos = {node: nodeview[node]["position"] for node in nodeview}
-    nx.draw_networkx_nodes(fw, pos, nodelist = list(greens), node_color='g')
-    nx.draw_networkx_nodes(fw, pos, nodelist = list(reds), node_color='r')
-    nx.draw_networkx_edges(fw, pos, alpha=0.2, width=1)
-    nx.draw_networkx_labels(fw,pos)
+    nx.draw_networkx_nodes(fw, pos, nodelist=list(greens), node_color='g')
+    nx.draw_networkx_nodes(fw, pos, nodelist=list(reds), node_color='r')
+    nx.draw_networkx_nodes(fw, pos, nodelist=list(reds), node_color='r')
+    if fw.edges:
+        nx.draw_networkx_edges(fw, pos, alpha=0.4, width=1)
+    nx.draw_networkx_labels(fw, pos)
 
+    if recent_edge:
+        nx.draw_networkx_edges(fw, pos,edgelist=[recent_edge], width=6, edge_color='b')
     for comp in big_comps:
         nx.draw_networkx_edges(fw.subgraph(list(comp)), pos, width=3)
-    plt.show()
+
+
+    if filename:
+        fig.savefig(filename, bbox_inches='tight')
+
+    if show:
+        plt.show()
+
 
 # creates the rigidity matrix for a d-dimensional framework
 # takes in a framework (nx graph with positions) and returns a numpy array

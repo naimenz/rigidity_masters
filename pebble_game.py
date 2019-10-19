@@ -13,6 +13,7 @@ def reverse(G, e):
 
 # detect the components using a directed graph D into which edge e has just been inserted
 # returns [] if no component, and otherwise returns the component as a list
+# l is a parameter from the pebble game
 def detect_comps(D, e, l):
     v1 = e[0]
     v2 = e[1]
@@ -265,24 +266,24 @@ def pebble_game(G, k, l):
             print("neither")
             return 3, comp_list
 
-g = nx.Graph()
-# g.add_nodes_from([0,1,2,3,4])
-# g.add_edges_from([(0,1), (1,2), (0,2), (0,3),(0,4), (3,4)])
-# g.add_nodes_from([0,1,2])
-# g.add_edges_from([(0,1), (1,2), (0,2)])
+# g = nx.Graph()
+# # g.add_nodes_from([0,1,2,3,4])
+# # g.add_edges_from([(0,1), (1,2), (0,2), (0,3),(0,4), (3,4)])
+# # g.add_nodes_from([0,1,2])
+# # g.add_edges_from([(0,1), (1,2), (0,2)])
 
-fig2b = nx.Graph()
-fig2b.add_nodes_from([0,1,2,3,4,5,6,7,8])
-fig2b.add_edges_from([(0,1), (0,7), (1,2), (1,7), (2,3), (2,4), (3,4),
-                        (3,8), (4,5), (5,6), (5,8), (6,7), (6,8), (7,8)])
+# fig2b = nx.Graph()
+# fig2b.add_nodes_from([0,1,2,3,4,5,6,7,8])
+# fig2b.add_edges_from([(0,1), (0,7), (1,2), (1,7), (2,3), (2,4), (3,4),
+#                         (3,8), (4,5), (5,6), (5,8), (6,7), (6,8), (7,8)])
 
-bar = nx.Graph()
-bar.add_nodes_from([0,1,2,3,4,5])
-bar.add_edges_from([(0,1), (0,3), (0,4), (1,2), (1,5), (2,3), (2,5), (3,4)])
-# p = pebble_game(bar, 2, 3)
+# bar = nx.Graph()
+# bar.add_nodes_from([0,1,2,3,4,5])
+# bar.add_edges_from([(0,1), (0,3), (0,4), (1,2), (1,5), (2,3), (2,5), (3,4)])
+# # p = pebble_game(bar, 2, 3)
 
-# nx.draw(fig2b)
-# plt.show()
-# p = pebble_game(fig2b, 2, 3)
-# print(p)
-# print(global_counter)
+# # nx.draw(fig2b)
+# # plt.show()
+# # p = pebble_game(fig2b, 2, 3)
+# # print(p)
+# # print(global_counter)
