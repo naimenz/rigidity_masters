@@ -18,12 +18,7 @@ fig_39_pos = [(0,0), (3,0), (3,2), (0,2)]
 fig_39_fw = create_framework(fig_39_nodes, fig_39_edges, fig_39_pos)
 R39 = create_rigidity_matrix(fig_39_fw, 2)
 
-def_node = [0,1,2,3]
-def_edge = [(0,1), (0,3), (1,2), (2,3)]
-def_pos = [(0,0), (4,0), (4,2), (0,2)]
 
-deformable_fw = create_framework(def_node, def_edge, def_pos)
-R = create_rigidity_matrix(deformable_fw, 2)
 
 rigid_3d = create_framework([0,1,2,3,4],
             [(0,1), (0,3), (1,2), (1,3), (2,3), (0,2), (0,4), (1,4), (2,4)],
@@ -36,37 +31,24 @@ fw_1d = create_framework([0,1,2],
 ok_(is_inf_rigid(fw_2d, 2))
 ok_(not is_inf_rigid(fw_3d, 3))
 ok_(is_inf_rigid(fw_1d, 1))
-ok_(not is_inf_rigid(deformable_fw, 2))
+# ok_(not is_inf_rigid(deformable_fw, 2))
 # draw_framework(deformable_fw)
 
-R = create_rigidity_matrix(deformable_fw, 2)
-# creating a force to apply
-# as an example, move points 0 and 2 towards each other
-# f is a d*n length vector
-f = [0] * len(R[0])
-f[0] = 1
-f[1] = -1
-f[4] = -1
-f[5] = 1
-f = np.array(f)
-print(R)
-print(f)
 
-print(R.dot(f))
-
-reduced_fw = create_reduced_fw(2,2,0.2)
+reduced_fw = create_reduced_fw(50,0.2, 1)
 
 # p = pebble_game(reduced_fw, 2, 3)
 # print(p[1])
 # draw_framework(reduced_fw)
 # draw_comps(reduced_fw, p[1])
 # experimenting with reducing a framework gradually and tracking the number of components
-rand_fw = create_random_fw(2,2,0.2)
+rand_fw = create_random_fw(20,0.2, 1)
 num_comps = constructive_pebble_game(rand_fw, 2, 3)
+
 fig = plt.figure(figsize=(20,10))
 # plotting the number of comps(reversed to show removal)
 plt.plot(num_comps)
-fig.savefig("comp_numbers.pdf")
+# fig.savefig("comp_numbers.pdf")
 plt.show()
 # draw_framework(rand_fw, "before.pdf")
 # num_comps = []
@@ -83,4 +65,43 @@ plt.show()
 #             plt.close("all")
 
 # draw_comps(rand_fw, comps, "after.pdf")
+
+# Edges are not reported consistently so will always sort them before indexing
+# of the edges will always be the same
+def_node = [0,1,2,3]
+def_edge = [(0,1), (0,3), (1,2), (2,3)]
+def_pos = [(0,0), (4,0), (4,2), (0,2)]
+deformable_fw = create_framework(def_node, def_edge, def_pos)
+R = create_rigidity_matrix(deformable_fw, 2)
+# creating a force to apply
+# as an example, move points 0 and 2 towards each other
+# f is a d*n length vector
+R = create_rigidity_matrix(rand_fw, 2)
+f = [0] * len(R[0])
+# f[82] = -0.1
+# f[83] = 0.1
+# f[114] = -0.1
+# f[115] = 0.1
+# f = np.array(f)
+# print(R)
+# print(f)
+
+# print(R.dot(f))
+# draw_stresses(rand_fw, f)
+
+# draw_framework(fw_2d)
+sq_nodes = [0,1,2,3]
+sq_edges = [(0,1), (0,3), (1,2), (2,3), (0,2)]
+sq_pos = [(0,0), (4,0), (4,4), (0,4)]
+sq_fw = create_framework(sq_nodes, sq_edges, sq_pos)
+print(sq_fw.edges)
+print(sorted(sq_fw.edges))
+f = [0] * len(sq_nodes) * 2
+f[0] = 1
+f[1] = 1
+f[4] = -1
+f[5] = -1
+
+draw_stresses(sq_fw, f)
+
 

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import numpy.linalg as ln
-import poisson as pd
+import poisson_disc_sample as pd
 from scipy.spatial import Delaunay
 
 # simple function wrapping graph creation in nx
@@ -44,20 +44,19 @@ def delaunay_to_edges(d):
         rv.append((tri[0], tri[2]))
     return rv
 
-# creates a random framework in a grid of (width x height) with min dist r
-# bottom left corner on (0,0). Edges are from the delaunay triangulation
-def create_random_fw(w, h, r):
-    positions = pd.poisson_disc_sample(w, h, r)
+# creates a random framework with n points and minimum distance r, starting at (0,0).
+# Edges are from the delaunay triangulation
+def create_random_fw(n, r, seed=None):
+    positions = pd.poisson_disc_sample(n, r, seed)
     nodes = list(range(len(positions)))
     edges = delaunay_to_edges(Delaunay(positions))
     fw = create_framework(nodes, edges, positions)
     return fw
 
-
 # creates a random framework and then removes edges until 
 # (still in 2D)
-def create_reduced_fw(w,h,r):
-    fw = create_random_fw(w,h,r)
+def create_reduced_fw(n, r, seed=None):
+    fw = create_random_fw(n, r, seed)
     while len(fw.edges) > 2*len(fw.nodes):
             index = np.random.choice(len(fw.edges))
             edge = list(fw.edges)[index]
@@ -97,7 +96,6 @@ def draw_comps(fw, comps, filename=None, show=True, recent_edge=None):
     pos = {node: nodeview[node]["position"] for node in nodeview}
     nx.draw_networkx_nodes(fw, pos, nodelist=list(greens), node_color='g')
     nx.draw_networkx_nodes(fw, pos, nodelist=list(reds), node_color='r')
-    nx.draw_networkx_nodes(fw, pos, nodelist=list(reds), node_color='r')
     if fw.edges:
         nx.draw_networkx_edges(fw, pos, alpha=0.4, width=1)
     nx.draw_networkx_labels(fw, pos)
@@ -124,7 +122,7 @@ def create_rigidity_matrix(fw, d):
     e = len(edgeview)
     M = np.zeros((e, d*n))
         
-    for row, edge in enumerate(edgeview):
+    for row, edge in enumerate(sorted(edgeview)):
         i,j = edge
         pos1 = nodeview[i]["position"]
         pos2 = nodeview[j]["position"]
@@ -168,3 +166,37 @@ def is_inf_rigid(fw, d):
     # print("d=",d," - ",ln.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
     return ln.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
 
+# draws the framework 'fw' with stresses resulting from force 'f'
+def draw_stresses(fw, f):
+    R = create_rigidity_matrix(fw, 2)
+    s = R.dot(f)
+    # drawing the nodes of the graph
+    fig = plt.figure(figsize=(8,8))
+    nodeview = fw.nodes
+
+    pos = {node: nodeview[node]["position"] for node in nodeview}
+
+    e_labels=dict()
+    for i, edge in enumerate(sorted(fw.edges)):
+        e_labels[edge] = np.round(s[i], 4)
+
+    # places where the force is being applied will be coloured green
+    applied_forces = dict()
+    for i in range(len(f)):
+        # if the force is non-zero and this is the x coord of it
+        if f[i] != 0 and i%2 == 0:
+            # put the force into a dictionary
+            applied_forces[i//2] = (f[i], f[i+1])
+       
+    # nx.draw_networkx_labels(fw, pos)
+    # nx.draw_networkx_edges(fw, pos, color=s, cmap=plt.cm.plasma, width=5)
+    nx.draw(fw, pos, edge_color=s,
+            width=4, edge_cmap=plt.cm.coolwarm, with_labels=True)
+    nx.draw_networkx_nodes(fw, pos, nodelist=applied_forces.keys(), node_color='green')
+    nx.draw_networkx_edge_labels(fw, pos, e_labels)
+    # nx.draw_networkx_nodes(fw, pos, node_color='r')
+    for key in applied_forces.keys():
+        x, y = fw.nodes[key]["position"]
+        plt.plot([x,x+applied_forces[key][0]], [y,y+applied_forces[key][1]], color='k', linestyle='-', linewidth=4)
+
+    plt.show()
