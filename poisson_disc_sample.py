@@ -16,10 +16,12 @@ def grid_indices(point, a, step):
 
 # get the neighbouring points of a point in the grid
 # also sneakily contains a check that the input point is actually in the domain
+# NOTE: This defines a circle, so some of the grid isn't used
 def find_neighbours(point, grid, a, step):
     i, j = grid_indices(point, a, step)
-    if i < 0 or i > 2*a or j < 0 or j > 2*a:
+    if (i-a)**2 + (j-a)**2 > (a)**2:
         return None, False
+
     # values of neighbouring cells gives the indices of their points
     rv = []
     for s in range(-5, 6):
@@ -27,8 +29,23 @@ def find_neighbours(point, grid, a, step):
             if i+s >= 0 and i+s < 2*a and j+t >= 0 and j+t < 2*a:
                 rv.append(grid[i+s, j+t])
 
-
     return [index for index in rv if index >= 0], True
+
+
+# get the neighbouring points of a point in the grid
+# also sneakily contains a check that the input point is actually in the domain
+# def find_neighbours(point, grid, a, step):
+#     i, j = grid_indices(point, a, step)
+#     if i < 0 or i > 2*a or j < 0 or j > 2*a:
+#         return None, False
+#     # values of neighbouring cells gives the indices of their points
+#     rv = []
+#     for s in range(-5, 6):
+#         for t in range(-5, 6):
+#             if i+s >= 0 and i+s < 2*a and j+t >= 0 and j+t < 2*a:
+#                 rv.append(grid[i+s, j+t])
+
+#     return [index for index in rv if index >= 0], True
 
 # generate a set of random points using the Poisson disc sampling 
 # algorithm from Nick Bostock's blog

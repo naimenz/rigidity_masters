@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 import networkx as nx
 import numpy as np
 import numpy.linalg as ln
@@ -47,7 +48,7 @@ def delaunay_to_edges(d):
 # creates a random framework with n points and minimum distance r, starting at (0,0).
 # Edges are from the delaunay triangulation
 def create_random_fw(n, r, seed=None):
-    positions = pd.poisson_disc_sample(n, r, seed)
+    positions = pd.poisson_disc_sample(n, r=r, seed=seed)
     nodes = list(range(len(positions)))
     edges = delaunay_to_edges(Delaunay(positions))
     fw = create_framework(nodes, edges, positions)
@@ -56,7 +57,7 @@ def create_random_fw(n, r, seed=None):
 # creates a random framework and then removes edges until 
 # (still in 2D)
 def create_reduced_fw(n, r, seed=None):
-    fw = create_random_fw(n, r, seed)
+    fw = create_random_fw(n, r=r, seed=seed)
     while len(fw.edges) > 2*len(fw.nodes):
             index = np.random.choice(len(fw.edges))
             edge = list(fw.edges)[index]
@@ -166,6 +167,22 @@ def is_inf_rigid(fw, d):
     # print("d=",d," - ",ln.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
     return ln.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
 
+
+
+# Code from https://stackoverflow.com/questions/20144529/shifted-colorbar-matplotlib/20146989#20146989
+# for making the midpoint of the colormap 0
+class MidpointNormalize(Normalize):
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        # I'm ignoring masked values and all kinds of edge cases to make a
+        # simple example...
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y))
+
+
 # draws the framework 'fw' with stresses resulting from force 'f'
 def draw_stresses(fw, f):
     R = create_rigidity_matrix(fw, 2)
@@ -188,15 +205,16 @@ def draw_stresses(fw, f):
             # put the force into a dictionary
             applied_forces[i//2] = (f[i], f[i+1])
        
-    # nx.draw_networkx_labels(fw, pos)
-    # nx.draw_networkx_edges(fw, pos, color=s, cmap=plt.cm.plasma, width=5)
+    cmap = plt.cm.coolwarm
+    norm = MidpointNormalize(midpoint=0)
     nx.draw(fw, pos, edge_color=s,
-            width=4, edge_cmap=plt.cm.coolwarm, with_labels=True)
+            width=4, edge_cmap=cmap, norm=norm, with_labels=True)
+    # STRESSED NODES IN GREEN
     nx.draw_networkx_nodes(fw, pos, nodelist=applied_forces.keys(), node_color='green')
     nx.draw_networkx_edge_labels(fw, pos, e_labels)
-    # nx.draw_networkx_nodes(fw, pos, node_color='r')
+    # drawing the applied forces as black bars
     for key in applied_forces.keys():
         x, y = fw.nodes[key]["position"]
-        plt.plot([x,x+applied_forces[key][0]], [y,y+applied_forces[key][1]], color='k', linestyle='-', linewidth=4)
+        plt.plot([x,x+applied_forces[key][0]], [y,y+applied_forces[key][1]], color='k', linestyle='-', linewidth=2)
 
     plt.show()
