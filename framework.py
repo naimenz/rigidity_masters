@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import networkx as nx
 import numpy as np
-import numpy.linalg as ln
+import numpy.linalg as lin
 import poisson_disc_sample as pd
 from scipy.spatial import Delaunay
 
@@ -141,14 +141,14 @@ def create_rigidity_matrix(fw, d):
 # function to calculate the nullity (and hence dimension of space of inf. rigid motions) of R
 def nullity(R):
     n = R.shape[1]
-    return n - ln.matrix_rank(R)
+    return n - lin.matrix_rank(R)
 
 # calculate the dimension of the affine span of vectors
 # works by shifting v0 to the origin and calculating the span of that set of vectors
 def calc_affine_span_dim(vectors):
     v0 = vectors[0] 
     new_vs = np.array([v - v0 for v in vectors])
-    return ln.matrix_rank(new_vs)
+    return lin.matrix_rank(new_vs)
 
 # takes a normal (non constricted, i.e. not embedded in lower dimensions) d-space framework
 # and returns True if it is inf. rigid, False otherwise
@@ -164,8 +164,8 @@ def is_inf_rigid(fw, d):
 
     # else:
     R = create_rigidity_matrix(fw, d)
-    # print("d=",d," - ",ln.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
-    return ln.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
+    # print("d=",d," - ",lin.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
+    return lin.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
 
 
 
@@ -206,9 +206,9 @@ def draw_stresses(fw, f):
             applied_forces[i//2] = (f[i], f[i+1])
        
     cmap = plt.cm.coolwarm
-    norm = MidpointNormalize(midpoint=0)
+    # norm = MidpointNormalize(midpoint=0)
     nx.draw(fw, pos, edge_color=s,
-            width=4, edge_cmap=cmap, norm=norm, with_labels=True)
+            width=4, edge_cmap=cmap, edge_vmin=-max(abs(s)), edge_vmax=max(abs(s)), with_labels=True)
     # STRESSED NODES IN GREEN
     nx.draw_networkx_nodes(fw, pos, nodelist=applied_forces.keys(), node_color='green')
     nx.draw_networkx_edge_labels(fw, pos, e_labels)
