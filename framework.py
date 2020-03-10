@@ -2,8 +2,9 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import networkx as nx
 import numpy as np
-import numpy.linalg as lin
+import scipy.linalg as lin
 import poisson_disc_sample as pd
+
 from scipy.spatial import Delaunay
 
 # simple function wrapping graph creation in nx
@@ -113,7 +114,6 @@ def draw_comps(fw, comps, filename=None, show=True, recent_edge=None):
     if show:
         plt.show()
 
-
 # creates the rigidity matrix for a d-dimensional framework
 # takes in a framework (nx graph with positions) and returns a numpy array
 def create_rigidity_matrix(fw, d):
@@ -138,17 +138,24 @@ def create_rigidity_matrix(fw, d):
 
     return M
 
+# creates the rigidity matrix with its nullspace appended as rows beneath
+def create_augmented_rigidity_matrix(fw, d):
+    M = create_rigidity_matrix(fw, d)
+    null = lin.null_space(M)
+    R = np.vstack((M, null.T))
+    return R
+
 # function to calculate the nullity (and hence dimension of space of inf. rigid motions) of R
 def nullity(R):
     n = R.shape[1]
-    return n - lin.matrix_rank(R)
+    return n - np.linalg.matrix_rank(R)
 
 # calculate the dimension of the affine span of vectors
 # works by shifting v0 to the origin and calculating the span of that set of vectors
 def calc_affine_span_dim(vectors):
     v0 = vectors[0] 
     new_vs = np.array([v - v0 for v in vectors])
-    return lin.matrix_rank(new_vs)
+    return np.linalg.matrix_rank(new_vs)
 
 # takes a normal (non constricted, i.e. not embedded in lower dimensions) d-space framework
 # and returns True if it is inf. rigid, False otherwise
@@ -163,9 +170,10 @@ def is_inf_rigid(fw, d):
     #     return False
 
     # else:
-    R = create_rigidity_matrix(fw, d)
-    # print("d=",d," - ",lin.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
-    return lin.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
+    R = create_augmented_rigidity_matrix(fw, d)
+    # R = create_rigidity_matrix(fw, d)
+    # print("d=",d," - ",np.linalg.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
+    return np.linalg.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
 
 
 
@@ -185,8 +193,12 @@ class MidpointNormalize(Normalize):
 
 # draws the framework 'fw' with stresses resulting from force 'f'
 def draw_stresses(fw, f):
-    R = create_rigidity_matrix(fw, 2)
-    s = R.dot(f)
+    R = create_augmented_rigidity_matrix(fw, 2)
+    R1 = create_rigidity_matrix(fw, 2)
+    s1 = R.dot(f)
+    s = R1.dot(f)
+    print("OLD:",s1)
+    print("NEW:",s)
     # drawing the nodes of the graph
     fig = plt.figure(figsize=(8,8))
     nodeview = fw.nodes
@@ -199,9 +211,9 @@ def draw_stresses(fw, f):
 
     # places where the force is being applied will be coloured green
     applied_forces = dict()
-    for i in range(len(f)):
-        # if the force is non-zero and this is the x coord of it
-        if f[i] != 0 and i%2 == 0:
+    for i in range(0, len(f), 2):
+        # if the force is non-zero 
+        if (f[i] != 0 or f[i+1] != 0):
             # put the force into a dictionary
             applied_forces[i//2] = (f[i], f[i+1])
        
@@ -217,4 +229,5 @@ def draw_stresses(fw, f):
         x, y = fw.nodes[key]["position"]
         plt.plot([x,x+applied_forces[key][0]], [y,y+applied_forces[key][1]], color='k', linestyle='-', linewidth=2)
 
+    fig.savefig("stress.png")
     plt.show()

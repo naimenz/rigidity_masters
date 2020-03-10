@@ -136,7 +136,7 @@ def update_components(D, e, l, comp_list, comp_matrix):
 # 3: other (neither sparse nor spanning)
 
 # NOTE specifically designed for simple graphs with (k,l)=(2,3), so might not work for all ks and ls
-def constructive_pebble_game(G, k, l):
+def constructive_pebble_game(G, k, l, save=False):
     # array to keep track of component numbers
     rv = []
     E = G.edges
@@ -263,7 +263,11 @@ def constructive_pebble_game(G, k, l):
 
         # add the edge to the display graph and draw it
         H.add_edge(u, v)
-        draw_comps(H, comp_list, filename="component_images/edge"+str(COUNTER)+".png", show=False, recent_edge=(u,v))
+        if save:
+            draw_comps(H, comp_list, filename="component_images/edge"+str(COUNTER)+".png", show=False, recent_edge=(u,v))
+        else:
+            draw_comps(H, comp_list, filename=None, show=True, recent_edge=(u,v))
+
         rv.append(len(comp_list))
         plt.close('all')
 
@@ -289,10 +293,10 @@ def constructive_pebble_game(G, k, l):
             return rv
 
 # g = nx.Graph()
-# # g.add_nodes_from([0,1,2,3,4])
-# # g.add_edges_from([(0,1), (1,2), (0,2), (0,3),(0,4), (3,4)])
-# # g.add_nodes_from([0,1,2])
-# # g.add_edges_from([(0,1), (1,2), (0,2)])
+# g.add_nodes_from([0,1,2,3,4])
+# g.add_edges_from([(0,1), (1,2), (0,2), (0,3),(0,4), (3,4)])
+# g.add_nodes_from([0,1,2])
+# g.add_edges_from([(0,1), (1,2), (0,2)])
 
 # fig2b = nx.Graph()
 # fig2b.add_nodes_from([0,1,2,3,4,5,6,7,8])
@@ -302,10 +306,10 @@ def constructive_pebble_game(G, k, l):
 # bar = nx.Graph()
 # bar.add_nodes_from([0,1,2,3,4,5])
 # bar.add_edges_from([(0,1), (0,3), (0,4), (1,2), (1,5), (2,3), (2,5), (3,4)])
-# # p = pebble_game(bar, 2, 3)
+# p = constructive_pebble_game(bar, 2, 3)
 
-# # nx.draw(fig2b)
-# # plt.show()
-# # p = pebble_game(fig2b, 2, 3)
-# # print(p)
-# # print(global_counter)
+# nx.draw(fig2b)
+# plt.show()
+# p = pebble_game(fig2b, 2, 3)
+# print(p)
+# print(global_counter)
