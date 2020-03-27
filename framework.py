@@ -6,12 +6,15 @@ import scipy.linalg as lin
 import poisson_disc_sample as pd
 
 from scipy.spatial import Delaunay
+from scipy.optimize import minimize
+from scipy.optimize import linprog
 
 # simple function wrapping graph creation in nx
+# NOTE: sorts the edges before adding them to the graph
 def create_structure_graph(nodes, edges):
     g = nx.Graph()
-    g.add_nodes_from(nodes)
-    g.add_edges_from(edges)
+    g.add_nodes_from(sorted(nodes))
+    g.add_edges_from(sorted(edges))
     return g
 
 # add an embedding to a structure graph, creating a framework
@@ -30,12 +33,38 @@ def assign_pos(graph, positions):
 
     return fw
 
-# takes a set of nodes, edges, and positions and create a framework
+# takes a set of nodes, edges, and positions and create a framework with lengths on edges
 def create_framework(nodes, edges, positions):
     g = create_structure_graph(nodes, edges)
     fw = assign_pos(g, positions)
-
+    fw = add_lengths_and_stiffs(fw)
     return fw
+
+# get the lengths of each edge in the framework 
+# also add bulk modulus (lambda) of 1
+def add_lengths_and_stiffs(fw):
+    # create a copy to add the lengths to and to return
+    rv = fw.copy()
+    for edge in rv.edges:
+        v1 = edge[0]
+        v2 = edge[1]
+        pos1 = rv.nodes[v1]["position"]
+        pos2 = rv.nodes[v2]["position"]
+        l = 0
+        for i in range(len(pos1)):
+            l += (pos1[i] - pos2[i])**2
+        l = np.sqrt(l)
+        rv.edges[edge]["length"] = l
+        rv.edges[edge]["lam"] = 1
+    return rv
+
+# generate the flexibility matrix (as defined in The Paper)
+# NOTE: we assume a constant material modulus (lam) of 1 (as I don't know anything about this)
+# because lam=1, and the diag is 1/ki = 1/(lam/length), we just get a diagonal matrix of lengths
+# NOTE: I don't know what to do about 0 stiffness, so atm i'll just set it to 0 manually
+def flex_mat(fw):
+    entries = [fw.edges[edge]["length"]/fw.edges[edge]["lam"] if fw.edges[edge]["lam"]!= 0 else 0 for edge in sorted(fw.edges)]
+    return np.diag(entries)
 
 # convert a delaunay object into a list of edges that can be used to create a framework
 def delaunay_to_edges(d):
@@ -55,8 +84,68 @@ def create_random_fw(n, r, seed=None):
     fw = create_framework(nodes, edges, positions)
     return fw
 
-# creates a random framework and then removes edges until 
-# (still in 2D)
+# making nice starting random frameworks using a Delaunay triangulation,
+# removing all 'long' edges from the periphery (as long as that doesn't create
+# pendant vertices) and then reducing using the two heuristics Louis told 
+# me about (from some paper I can't find)
+def make_nice_fw(n, r, seed=None):
+    fw = create_random_fw(n, r=r, seed=seed)
+    N = len(fw.nodes)
+    i = 0
+    # TEST: first stripping all long edges
+    for edge in fw.edges:
+        X0 = np.array(fw.nodes[edge[0]]["position"])
+        X1 = np.array(fw.nodes[edge[1]]["position"])
+        if np.linalg.norm(X0 - X1) > 2 * r and heuristic2(fw, edge, degree=1):
+            fw.remove_edge(edge[0], edge[1])
+
+    while len(fw.edges) > 2 * N and i < len(fw.edges):
+        i += 1
+        index = np.random.choice(len(fw.edges))
+        edge = list(fw.edges)[index]
+        # TEST: removing all really long edges
+        if heuristic2(fw, edge) and heuristic1(fw, edge):
+            fw.remove_edge(edge[0], edge[1])
+            i = 0
+    if i == len(fw.edges):
+        print("FAILED TO REMOVE ALL EDGES")
+    return fw
+
+# from stackexchange: https://stackoverflow.com/a/43564754
+def in_hull(points, x):
+    points = np.array(points)
+    n_points = len(points)
+    n_dim = len(x)
+    c = np.zeros(n_points)
+    A = np.r_[points.T,np.ones((1,n_points))]
+    b = np.r_[x, np.ones(1)]
+    lp = linprog(c, A_eq=A, b_eq=b)
+    return lp.success
+
+# are all edges on the same 'side' of the node, 
+# i.e. are they contained in the same half space?
+# can be phrased in terms of convex combinations
+def heuristic1(fw, edge):
+    fwc = fw.copy()
+    # checking both nodes
+    fwc.remove_edge(edge[0], edge[1])
+    for node in edge:
+        neighbors = fwc.neighbors(node)
+        positions = [fwc.nodes[neighb]["position"] for neighb in neighbors]
+        # if the node isn't in the hull of its neighbours, then all the edges are on the same side
+        if not in_hull(positions, fwc.nodes[node]["position"]):
+            return False
+    # if both nodes succeeded, we pass this heuristic
+    return True
+
+# check that we aren't creating any degree two nodes
+def heuristic2(fw, edge, degree=2):
+    return (fw.degree(edge[0]) > degree+1 and fw.degree(edge[1]) > degree+1)
+
+
+# creates a random framework and then removes edges until
+# there are just twice as many edges left 
+# NOTE: not guaranteed to be rigid(still in 2D)
 def create_reduced_fw(n, r, seed=None):
     fw = create_random_fw(n, r=r, seed=seed)
     while len(fw.edges) > 2*len(fw.nodes):
@@ -66,16 +155,30 @@ def create_reduced_fw(n, r, seed=None):
                 fw.remove_edge(edge[0], edge[1])
     return fw
 
-def draw_framework(fw, filename=None):
+# if filename, an image is saved
+# if ghost, draw the ghost bonds (lam=0) a different colour
+def draw_framework(fw, filename=None, ghost=False):
     nodeview = fw.nodes
-    fig = plt.figure(figsize=(20,10))
+    fig, ax = plt.subplots(figsize=(20,10))
+    ax.set_aspect('equal')
     pos = {node: nodeview[node]["position"] for node in nodeview}
     nx.draw_networkx_nodes(fw, pos, with_labels=True)
-    nx.draw_networkx_edges(fw, pos, with_labels=True)
     nx.draw_networkx_labels(fw,pos)
+
+    # draw edges, with or without care for ghost edges
+    if ghost:
+        ghost_es = set([edge for edge in fw.edges if fw.edges[edge]["lam"]==0])
+        other_es = set(fw.edges) - ghost_es
+        nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed", with_labels=True)
+        nx.draw_networkx_edges(fw, pos, edgelist=other_es, with_labels=True)
+
+    else:
+        nx.draw_networkx_edges(fw, pos, with_labels=True)
+
     if filename:
         fig.savefig(filename, bbox_inches='tight')
-    plt.show()
+    else:
+        plt.show()
 
 # draws the components 'comps' of the framework 'fw'
 # trivial components have their edges drawn in grey
@@ -92,7 +195,8 @@ def draw_comps(fw, comps, filename=None, show=True, recent_edge=None):
                 greens |= A & B
 
     # drawing the nodes of the graph
-    fig = plt.figure(figsize=(20,10))
+    fig, ax = plt.subplots(figsize=(20,10))
+    ax.set_aspect('equal')
     nodeview = fw.nodes
     reds = set(nodeview) - greens
     pos = {node: nodeview[node]["position"] for node in nodeview}
@@ -116,12 +220,13 @@ def draw_comps(fw, comps, filename=None, show=True, recent_edge=None):
 
 # creates the rigidity matrix for a d-dimensional framework
 # takes in a framework (nx graph with positions) and returns a numpy array
-def create_rigidity_matrix(fw, d):
+def rig_mat(fw, d=2):
     edgeview = fw.edges
     nodeview = fw.nodes
     n = len(list(fw))
     e = len(edgeview)
     M = np.zeros((e, d*n))
+    # print("SORTED",sorted(edgeview))
         
     for row, edge in enumerate(sorted(edgeview)):
         i,j = edge
@@ -140,7 +245,7 @@ def create_rigidity_matrix(fw, d):
 
 # creates the rigidity matrix with its nullspace appended as rows beneath
 def create_augmented_rigidity_matrix(fw, d):
-    M = create_rigidity_matrix(fw, d)
+    M = rig_mat(fw, d=2)
     null = lin.null_space(M)
     R = np.vstack((M, null.T))
     return R
@@ -171,10 +276,9 @@ def is_inf_rigid(fw, d):
 
     # else:
     R = create_augmented_rigidity_matrix(fw, d)
-    # R = create_rigidity_matrix(fw, d)
+    # R = rig_mat(fw, d)
     # print("d=",d," - ",np.linalg.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
     return np.linalg.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
-
 
 
 # Code from https://stackoverflow.com/questions/20144529/shifted-colorbar-matplotlib/20146989#20146989
@@ -191,16 +295,17 @@ class MidpointNormalize(Normalize):
         return np.ma.masked_array(np.interp(value, x, y))
 
 
-# draws the framework 'fw' with stresses resulting from force 'f'
-def draw_stresses(fw, f):
+# draws the framework 'fw' with tensions resulting from force 'f'
+def draw_tensions(fw, f):
     R = create_augmented_rigidity_matrix(fw, 2)
-    R1 = create_rigidity_matrix(fw, 2)
+    R1 = rig_mat(fw, 2)
     s1 = R.dot(f)
     s = R1.dot(f)
     print("OLD:",s1)
     print("NEW:",s)
     # drawing the nodes of the graph
-    fig = plt.figure(figsize=(8,8))
+    fig, ax = plt.subplots(figsize=(20,10))
+    ax.set_aspect('equal')
     nodeview = fw.nodes
 
     pos = {node: nodeview[node]["position"] for node in nodeview}
@@ -229,5 +334,172 @@ def draw_stresses(fw, f):
         x, y = fw.nodes[key]["position"]
         plt.plot([x,x+applied_forces[key][0]], [y,y+applied_forces[key][1]], color='k', linestyle='-', linewidth=2)
 
-    fig.savefig("stress.png")
+    # fig.savefig("stress.png")
     plt.show()
+    
+# get extensions from applied tension to framework
+def extensions(fw, tstar):
+    R = rig_mat(fw,2)
+    Rt = R.T
+    F = flex_mat(fw)
+    Finv = np.linalg.pinv(F)
+    H = Rt.dot(Finv).dot(R)
+    Hinv = np.linalg.pinv(H)
+    return R.dot(Hinv.dot(Rt).dot(tstar))
+
+# test function to see if I can work out the extensions from removing each edge
+def all_extensions(fw, tstar):
+    exts = []
+    R = rig_mat(fw,2)
+    Rt = R.T
+    for edge in fw.edges:
+        fwc = fw.copy()  
+        fwc.edges[edge]["lam"] = 0
+        F = flex_mat(fwc)
+        Finv = np.linalg.pinv(F)
+        H = Rt.dot(Finv).dot(R)
+        Hinv = np.linalg.pinv(H)
+        exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
+    return exts
+
+# converts extensions to strains for a given framework
+# NOTE: works on a single set of extensions
+def exts_to_strains(fw, exts):
+    Nb = len(exts)
+    strains = [0]*Nb
+    edge_list = list(fw.edges)
+    for i in range(Nb):
+        strains[i] = exts[i] / fw.edges[edge_list[i]]["length"]
+
+    return strains
+
+        
+# implementing the cost function on strains as in the paper
+def cost_f(ns, nstars):
+    cost = 0
+    for nj, njstar in zip(ns, nstars):
+        if njstar == 0:
+            cost += nj**2
+        else:
+            cost += (nj/njstar - 1)**2
+
+    return cost
+
+# borrowing heavily from draw_tensions, trying to draw the strains on the bonds
+def draw_strains(fw, strains,ghost=False, filename=None):
+    # works on a numpy array
+    strains = np.array(strains)
+    # drawing the nodes of the graph
+    fig, ax = plt.subplots(figsize=(20,10))
+    ax.set_aspect('equal')
+    nodeview = fw.nodes
+
+    pos = {node: nodeview[node]["position"] for node in nodeview}
+
+    e_labels=dict()
+    for i, edge in enumerate(fw.edges):
+        e_labels[edge] = np.round(strains[i], 4)
+       
+    cmap = plt.cm.coolwarm
+    nx.draw(fw, pos, edge_color=strains,
+            width=4, edge_cmap=cmap, edge_vmin=-max(abs(strains)), edge_vmax=max(abs(strains)), with_labels=True)
+    if ghost:
+        ghost_es = set([edge for edge in fw.edges if fw.edges[edge]["lam"]==0])
+        nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed")
+    nx.draw_networkx_edge_labels(fw, pos, e_labels)
+
+    if filename:
+        fig.savefig(filename, bbox_inches='tight')
+
+    plt.show()
+
+
+def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.0001, it_thresh=10000, draw=False):
+    fw = fw_orig.copy()
+    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+
+    # modifying the framework to change two bonds to ghost bonds (source and target)
+    fw.edges[source]["lam"] = 0
+    fw.edges[target]["lam"] = 0
+
+    tensions = [0]*len(fw.edges)
+    tensions[edge_dict[source]] = tension
+    strains = exts_to_strains(fw, extensions(fw, tensions))
+    print("initial strain ratio:",strains[edge_dict[target]]/strains[edge_dict[source]])
+    if draw:
+        draw_strains(fw, strains, ghost=True)
+
+    # aiming for proportional movement of (16,17) when (9,12) moves
+
+    # calculating ns test
+    it = 0
+    min_cost = np.inf
+    while min_cost > cost_thresh and it < it_thresh:
+        costs = []
+        exts_list = all_extensions(fw, tensions)
+        for i, exts in enumerate(exts_list):
+            strains = exts_to_strains(fw, exts)
+            ns = [strains[edge_dict[target]] / strains[edge_dict[source]]]
+            costs.append(cost_f(ns, nstars))
+        min_cost = min(costs)
+        index_to_remove = costs.index(min_cost)
+        edge_to_remove = list(fw.edges)[index_to_remove]
+        fw.edges[edge_to_remove]["lam"] = 0
+        print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+        it+=1
+
+    return fw
+
+
+# ============================================================================== 
+# ANIMATION FUNCTIONS
+# ============================================================================== 
+# calculate the energy of the configuration
+# accepts a displacement vector u and the framework as *args from minimizer
+# displacements are structured as [x0, y0, x1, y1, ..., xn, yn] where there are n nodes
+def energy(u, *args):
+    fw = args[0]
+    energy = 0
+    # looping over all bonds in the network
+    for edge in fw.edges:
+        i = edge[0]
+        j = edge[1]
+        posi = np.array(fw.nodes[i]["position"])
+        posj = np.array(fw.nodes[j]["position"])
+        Xi = posi + np.array([u[2*i], u[2*i + 1]])
+        Xj = posj + np.array([u[2*j], u[2*j + 1]])
+        mag_Xij = np.linalg.norm(Xi - Xj)
+
+        lam = fw.edges[edge]["lam"]
+        lij = fw.edges[edge]["length"]
+        # stiffness of edge (i,j), kij, is material modulus lambda over equilibrium length
+        kij = lam/lij
+        energy += 0.5 * kij * (mag_Xij - lij)**2
+    return energy
+
+# function to ensure that the strain on the edge "edge" is "val"
+def source_strain(u, *args):
+    fw = args[0]
+    edge = args[1]
+    val = args[2]
+
+    # dict to get edge index from name
+    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+    # getting the rigidity matrix (Q^T) to calculate extensions from displacement
+    R = rig_mat(fw)
+    exts = R.dot(u)
+    strains = exts_to_strains(fw, exts)
+    index = edge_dict[edge]
+    # returns 0 if constraint is met
+    return strains[index] - val
+
+# create a copy of the framework with positions changed according to a given displacement
+def update_pos(fw, u):
+    fwc = fw.copy()
+    for i in fwc.nodes:
+        disp = np.array([u[2*i], u[2*i + 1]])
+        pos = np.array(fwc.nodes[i]["position"])
+        new_pos = list(pos + disp)
+        fwc.nodes[i]["position"] = new_pos
+
+    return fwc

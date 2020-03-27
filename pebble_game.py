@@ -132,7 +132,7 @@ def update_components(D, e, l, comp_list, comp_matrix):
 # 3: other (neither sparse nor spanning)
 
 # NOTE specifically designed for simple graphs with (k,l)=(2,3), so might not work for all ks and ls
-def pebble_game(G, k, l):
+def pebble_game(G, k=2, l=3):
     E = G.edges
 
     # constructing the directed graph D to keep track of progress
