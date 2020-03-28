@@ -123,7 +123,7 @@ def in_hull(points, x):
     return lp.success
 
 # are all edges on the same 'side' of the node, 
-# i.e. are they contained in the same half space?
+# i.e. are they contained in the same half space (defined by an hplane that goes through the node)?
 # can be phrased in terms of convex combinations
 def heuristic1(fw, edge):
     fwc = fw.copy()
@@ -352,7 +352,7 @@ def all_extensions(fw, tstar):
     exts = []
     R = rig_mat(fw,2)
     Rt = R.T
-    for edge in fw.edges:
+    for edge in sorted(fw.edges):
         fwc = fw.copy()  
         fwc.edges[edge]["lam"] = 0
         F = flex_mat(fwc)
@@ -367,12 +367,11 @@ def all_extensions(fw, tstar):
 def exts_to_strains(fw, exts):
     Nb = len(exts)
     strains = [0]*Nb
-    edge_list = list(fw.edges)
+    edge_list = sorted(fw.edges)
     for i in range(Nb):
         strains[i] = exts[i] / fw.edges[edge_list[i]]["length"]
 
     return strains
-
         
 # implementing the cost function on strains as in the paper
 def cost_f(ns, nstars):
@@ -397,26 +396,24 @@ def draw_strains(fw, strains,ghost=False, filename=None):
     pos = {node: nodeview[node]["position"] for node in nodeview}
 
     e_labels=dict()
-    for i, edge in enumerate(fw.edges):
+    for i, edge in enumerate(sorted(fw.edges)):
         e_labels[edge] = np.round(strains[i], 4)
        
     cmap = plt.cm.coolwarm
     nx.draw(fw, pos, edge_color=strains,
             width=4, edge_cmap=cmap, edge_vmin=-max(abs(strains)), edge_vmax=max(abs(strains)), with_labels=True)
     if ghost:
-        ghost_es = set([edge for edge in fw.edges if fw.edges[edge]["lam"]==0])
+        ghost_es = set([edge for edge in sorted(fw.edges) if fw.edges[edge]["lam"]==0])
         nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed")
     nx.draw_networkx_edge_labels(fw, pos, e_labels)
 
     if filename:
         fig.savefig(filename, bbox_inches='tight')
-
     plt.show()
 
-
-def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.0001, it_thresh=10000, draw=False):
+def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False):
     fw = fw_orig.copy()
-    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+    edge_dict = {edge: i for i, edge in enumerate(sorted(fw.edges))}
 
     # modifying the framework to change two bonds to ghost bonds (source and target)
     fw.edges[source]["lam"] = 0
@@ -428,8 +425,6 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
     print("initial strain ratio:",strains[edge_dict[target]]/strains[edge_dict[source]])
     if draw:
         draw_strains(fw, strains, ghost=True)
-
-    # aiming for proportional movement of (16,17) when (9,12) moves
 
     # calculating ns test
     it = 0
@@ -443,7 +438,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
             costs.append(cost_f(ns, nstars))
         min_cost = min(costs)
         index_to_remove = costs.index(min_cost)
-        edge_to_remove = list(fw.edges)[index_to_remove]
+        edge_to_remove = sorted(fw.edges)[index_to_remove]
         fw.edges[edge_to_remove]["lam"] = 0
         print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
         it+=1
@@ -461,7 +456,7 @@ def energy(u, *args):
     fw = args[0]
     energy = 0
     # looping over all bonds in the network
-    for edge in fw.edges:
+    for edge in sorted(fw.edges):
         i = edge[0]
         j = edge[1]
         posi = np.array(fw.nodes[i]["position"])
@@ -484,7 +479,7 @@ def source_strain(u, *args):
     val = args[2]
 
     # dict to get edge index from name
-    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+    edge_dict = {edge: i for i, edge in enumerate(sorted(fw.edges))}
     # getting the rigidity matrix (Q^T) to calculate extensions from displacement
     R = rig_mat(fw)
     exts = R.dot(u)

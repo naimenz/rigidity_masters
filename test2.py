@@ -36,8 +36,8 @@ fw = create_framework(nodes, edges, positions)
 draw_framework(fw)
 
 
-source = (17,18)
-target = (53,54)
+source = (24,32)
+target = (31,39)
 # fw.add_edges_from([source, target])
 # fw = add_lengths_and_stiffs(fw)
 fw = tune_network(fw, source, target, nstars=[1.0])
@@ -52,7 +52,7 @@ N = 30
 
 u0 = np.zeros(len(fw.nodes) * 2)
 for i in range(N):
-    strain_val = 0.4 *s_max * (i/(N-1))
+    strain_val = 0.9 *s_max * (i/(N-1))
     print("target strain val",strain_val)
     constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
     mind = minimize(energy, u0, args=(fw), constraints=constraints)
@@ -60,7 +60,7 @@ for i in range(N):
     print("minimiser:",mind)
     # use the new positions as the starting guess for the next round of optimisation
     u0 = mind.x
-    draw_framework(update_pos(fw, mind.x), filename="anim5/anim_"+str(i)+".png",ghost=True)
+    draw_framework(update_pos(fw, mind.x), filename="anim6/anim_"+str(i)+".png",ghost=True)
     plt.close()
     print("drawn",i+1,"images of",N)
 
