@@ -27,6 +27,7 @@ fw = tune_network(fw, source, target, tension=1, nstars=nstars, draw=True)
 tensions = [0]*len(fw.edges)
 tensions[edge_dict[source]] = 1
 strains = exts_to_strains(fw, extensions(fw, tensions))
+print("strains on source, target resp.",strains[edge_dict[source]], strains[edge_dict[target]])
 draw_strains(fw, strains, ghost=True)
 
 # getting the max strain on the source edge

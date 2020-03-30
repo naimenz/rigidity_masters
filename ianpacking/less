@@ -1,0 +1,1000 @@
+ 1022  vim input.params 
+ 1023  vim density.f90 
+ 1024  vim mcpolar.f90 
+ 1025  make clean
+ 1026  make
+ 1027  ./mcgrid 
+ 1028  vim draw.py 
+ 1029  vim mcpolar.f90 
+ 1030  vim density.f90 
+ 1031  vim 800
+ 1032  vim 800input.params 
+ 1033  vim 10input.params 
+ 1034  vim 800input.params 
+ 1035  cp 800input.params 10input.params 
+ 1036  vim input.params 
+ 1037  cp input.params 10input.params
+ 1038  cp 800input.params input.params 
+ 1039  vim mcpolar.f90 
+ 1040  make clean
+ 1041  ./mcgrid 
+ 1042  make
+ 1043  ./mcgrid 
+ 1044  vim tlaser800/timetaken4.txt 
+ 1045  vim draw.py 
+ 1046  vim mcpolar.f90 
+ 1047  git add .
+ 1048  git add tlaser*
+ 1049  git add tlaser/*
+ 1050  git add tlaser10/*
+ 1051  git add tlaser10/* -f
+ 1052  git add tlaser800/* -f
+ 1053  git commit -m "Cursory graphs for 10 and 800
+ 1054  "
+ 1055  vim mcpolar.f90
+ 1056  vim mcpolar.f90 
+ 1057  make clean
+ 1058  make
+ 1059  ./mcgrid 
+ 1060  vim draw.py 
+ 1061  vim mcpolar.f90 
+ 1062  make clean
+ 1063  make
+ 1064  ./mcgrid 
+ 1065  vim input.params 
+ 1066  make clean
+ 1067  make
+ 1068  ./mcgrid 
+ 1069  vim mcpolar.f90 
+ 1070  make
+ 1071  ./mcgrid 
+ 1072  vim draw.py 
+ 1073  vim mcpolar.f90 
+ 1074  vim draw.py 
+ 1075  git branch
+ 1076  vim draw.py 
+ 1077  vim mcpolar.f90 
+ 1078  cd ..
+ 1079  mkdir PLOTTINGHW2
+ 1080  git
+ 1081  git branch
+ 1082  git clone ~/Coding/fortran/MCRT/HW2/.git .
+ 1083  git clone ~/Coding/fortran/MCRT/HW2/.git PLOTTINGHW2/
+ 1084  cd PLOTTINGHW2/
+ 1085  ls
+ 1086  cd tlaser10/
+ 1087  ls
+ 1088  cd ../tlaser800/
+ 1089  ls
+ 1090  cd ..
+ 1091  cd ../HW2/
+ 1092  cd tlaser10/
+ 1093  ls
+ 1094  cd ..
+ 1095  vim draw.py 
+ 1096  ls
+ 1097  cd ../PLOTTINGHW2/
+ 1098  ls
+ 1099  mkdir ../graphs
+ 1100  vim draw.py 
+ 1101  git branch
+ 1102  git checkout master
+ 1103  ls
+ 1104  vim draw.py 
+ 1105  git add .
+ 1106  git commit -m "Better drawing"
+ 1107  vim draw.py 
+ 1108  git checkout delta_t
+ 1109  ls -la
+ 1110  vim draw.py 
+ 1111  git add .
+ 1112  git commit -m "Better drawing"
+ 1113  git checkout delta_t_no_partial 
+ 1114  ls
+ 1115  vim draw.py 
+ 1116  git checkout delta_t
+ 1117  ls
+ 1118  vim draw.py 
+ 1119  git checkout delta_t_no_partial 
+ 1120  vim draw.py 
+ 1121  git log --pretty=oneline
+ 1122  git branch
+ 1123  cd ../hw1/
+ 1124  ls
+ 1125  exit
+ 1126  cd Coding/fortran/MCRT/HW2/
+ 1127  jupyter notebook parameters.ipynb 
+ 1128  exit
+ 1129  cd Coding/fortran/MCRT/HW2/
+ 1130  ls
+ 1131  jupyter notebook parameters.ipynb 
+ 1132  vim draw.py 
+ 1133  vim mcpolar.f90 
+ 1134  make clean
+ 1135  make
+ 1136  ./mcgrid 
+ 1137  vim draw.py 
+ 1138  vim mcpolar.f90 
+ 1139  cd data2/
+ 1140  ls
+ 1141  vim timetaken800.txt 
+ 1142  c d..
+ 1143  cd ..
+ 1144  ls
+ 1145  vim timetaken10.txt 
+ 1146  vim mcpolar.f90 
+ 1147  vim density.f90 
+ 1148  vim 10input.params 
+ 1149  cp 10input.params input.params 
+ 1150  ls
+ 1151  make clean
+ 1152  make
+ 1153  vim mcpolar.f90 
+ 1154  make clean
+ 1155  make
+ 1156  ./mcgrid 
+ 1157  vim mcpolar.f90 
+ 1158  vim input.params 
+ 1159  make clean
+ 1160  make
+ 1161  ./mcgrid 
+ 1162  git ad d.
+ 1163  git add .
+ 1164  git commit -m "Test with seed +=1"
+ 1165  git push
+ 1166  git checkout -b master
+ 1167  git checkout master
+ 1168  ls
+ 1169  git branch
+ 1170  ls
+ 1171  git checkout origin
+ 1172  git checkout delta_t
+ 1173  ls
+ 1174  git checkout master
+ 1175  ls
+ 1176  git log --pretty
+ 1177  vim git checkout
+ 1178  man git checkout
+ 1179  man git log
+ 1180  git log --pretty=oneline
+ 1181  git checkout master
+ 1182  ls
+ 1183  vim mcpolar.f90 
+ 1184  ls
+ 1185  rm 800rhokap*
+ 1186  ls
+ 1187  vim 10input.params 
+ 1188  cp 10input.params input.params 
+ 1189  vim input.params 
+ 1190  vim density.f90 
+ 1191  make clean
+ 1192  make
+ 1193  ./mcgrid 
+ 1194  vim mcpolar.f90 
+ 1195  make
+ 1196  ./mcgrid 
+ 1197  vim input.params 
+ 1198  make clean
+ 1199  make
+ 1200  ./mcgrid 
+ 1201  vim mcpolar.f90 
+ 1202  make
+ 1203  ./mcgrid 
+ 1204  vim mcpolar.f90 
+ 1205  make
+ 1206  ./mcgrid 
+ 1207  vim draw.py 
+ 1208  vim mcpolar.f90 
+ 1209  make
+ 1210  make clean
+ 1211  make
+ 1212  ./mcgrid 
+ 1213  vim timetaken10.txt 
+ 1214  vim mcpolar.f90 
+ 1215  ls
+ 1216  mv rhokap.dat 800rhokap.dat
+ 1217  mv abs.dat 800abs.dat
+ 1218  vim mcpolar.f90 
+ 1219  mv 800rhokap.dat 10rhokap.dat
+ 1220  mv 800abs.dat 10abs.dat
+ 1221  vim mcpolar.f90 
+ 1222  vim density.f90 
+ 1223  vim 800input.params 
+ 1224  cp 800input.params input.params 
+ 1225  vim mcpolar.f90 
+ 1226  make clean
+ 1227  make
+ 1228  ./mcgrid 
+ 1229  vim d
+ 1230  vim draw.py 
+ 1231  vim mcpolar.f90 
+ 1232  make clean
+ 1233  make
+ 1234  ./mcgrid 
+ 1235  vim draw.py 
+ 1236  vim mcpolar.f90 
+ 1237  mkdir laser10
+ 1238  mkdir laser800
+ 1239  vim mcpolar.f90 
+ 1240  make clean
+ 1241  make
+ 1242  ./mcgrid 
+ 1243  vim mcpolar.f90 
+ 1244  make
+ 1245  ./mcgrid 
+ 1246  vim mcpolar.f90 
+ 1247  make
+ 1248  ./mcgrid 
+ 1249  vim mcpolar.f90 
+ 1250  make
+ 1251  ./mcgrid 
+ 1252  ls
+ 1253  cd laser
+ 1254  cd laser10/
+ 1255  ls
+ 1256  cd ..
+ 1257  cd laser800/
+ 1258  ls
+ 1259  vim timetaken1.txt 
+ 1260  vim timetaken4.txt 
+ 1261  cd ..
+ 1262  vim mcpolar.f90 
+ 1263  make
+ 1264  ./mcgrid 
+ 1265  ls laser800/
+ 1266  vim draw.py 
+ 1267  vim mcpolar.f90 
+ 1268  make
+ 1269  vim input.params 
+ 1270  vim density.f90 
+ 1271  vim mcpolar.f90 
+ 1272  make clean
+ 1273  make
+ 1274  ./mcgrid 
+ 1275  vim draw.py 
+ 1276  git branch
+ 1277  ls
+ 1278  vim laser10/
+ 1279  ls laser800/
+ 1280  git checkout master
+ 1281  git rm --checked
+ 1282  git remove --cached
+ 1283  git rm --cached
+ 1284  git rm --cached laser800/*
+ 1285  git checkout master
+ 1286  cd laser800/
+ 1287  vim timetaken4.txt 
+ 1288  cd ..
+ 1289  vim mcpolar.f90 
+ 1290  vim draw.py 
+ 1291  rm -R laser800/
+ 1292  git checkout master
+ 1293  git checkout -f master
+ 1294  ls
+ 1295  git push
+ 1296  git branch
+ 1297  git checkout delta_t
+ 1298  ls
+ 1299  cd ..
+ 1300  mkdir REPORTHW2
+ 1301  cd HW2/
+ 1302  cp report.* ../REPORTHW2
+ 1303  ls
+ 1304  cd ..
+ 1305  cd REPORTHW2/
+ 1306  ls
+ 1307  git init
+ 1308  git add .
+ 1309  git commit -m "Local repository for report writing"
+ 1310  cd ..
+ 1311  cd HW2/
+ 1312  ls
+ 1313  rm report.*
+ 1314  git add .
+ 1315  git commit -m "Moved report writing to different folder
+ 1316  "
+ 1317  git checkout master
+ 1318  ls
+ 1319  vim mcpolar.f90 
+ 1320  make clean
+ 1321  make
+ 1322  ./mcgrid 
+ 1323  vim draw.py 
+ 1324  vim mcpolar.f90 
+ 1325  vim density.
+ 1326  vim density.f90 
+ 1327  vim 10input.params 
+ 1328  cp 10input.params input.params 
+ 1329  vim mcpolar.f90 
+ 1330  make clean
+ 1331  make
+ 1332  ./mcgrid 
+ 1333  vim 10input.params 
+ 1334  cp 10input.params input.params 
+ 1335  make clean
+ 1336  make
+ 1337  ./mcgrid 
+ 1338  vim mcpolar.f90 
+ 1339  make
+ 1340  ./mcgrid 
+ 1341  vim draw.py 
+ 1342  vim mcpolar.f90 
+ 1343  vim density.f90 
+ 1344  vim 800input.params 
+ 1345  cp 800input.params input.params 
+ 1346  vim mcpolar.f90 
+ 1347  git add .
+ 1348  git add laser10/*
+ 1349  git add laser10/* -f
+ 1350  git add .
+ 1351  git commit -m "Nice results for 10um laser"
+ 1352  vim mcpolar.f90 
+ 1353  git push
+ 1354  vim mcpolar.f90 
+ 1355  vim input.params 
+ 1356  vim density.f90 
+ 1357  make
+ 1358  make clean
+ 1359  make
+ 1360  ./mcgrid 
+ 1361  vim draw.py 
+ 1362  git checkout delta_t
+ 1363  git add .
+ 1364  cd ../../
+ 1365  cd MCRT/HW2/
+ 1366  vim input.params 
+ 1367  vim draw.py 
+ 1368  cd tlaser800/
+ 1369  ls
+ 1370  vim timetaken1.txt 
+ 1371  vim timetaken3.txt 
+ 1372  vim timetaken1.txt 
+ 1373  git branch
+ 1374  ls
+ 1375  vim timetaken1.txt 
+ 1376  vim timetaken2
+ 1377  vim timetaken2.txt 
+ 1378  git branch
+ 1379  git commit -m "Results for small timestep 800"
+ 1380  cd ..
+ 1381  git add .
+ 1382  git commit -m "Results for small timestep 800"
+ 1383  git add tlaser800/*
+ 1384  git add tlaser800/* -f
+ 1385  git commit "Data for small timestep 800"
+ 1386  git commit -m "Data for small timestep 800"
+ 1387  git checkout -b delta_t_no_partial
+ 1388  ls
+ 1389  git branch
+ 1390  vim mcpolar.f90 
+ 1391  vim 800input.params 
+ 1392  cp 800input.params input.params 
+ 1393  make clean
+ 1394  make
+ 1395  ./mcgrid 
+ 1396  vim mcpolar.f90 
+ 1397  make
+ 1398  ./mcgrid 
+ 1399  vim mcpolar.f90 
+ 1400  make
+ 1401  ./mcgrid 
+ 1402  vim draw.py 
+ 1403  vim mcpolar.f90 
+ 1404  python draw.py 
+ 1405  vim mcpolar.f90 
+ 1406  make
+ 1407  ./mcgrid 
+ 1408  vim draw.py 
+ 1409  vim 800input.params 
+ 1410  make
+ 1411  cp 800input.params input.params 
+ 1412  vim density.f90 
+ 1413  make
+ 1414  make clean
+ 1415  make
+ 1416  ./mcgrid 
+ 1417  vim draw.py 
+ 1418  vim mcpolar.f90 
+ 1419  vim density.f90 
+ 1420  vim 10input.params 
+ 1421  cp 10input.params input.params 
+ 1422  make
+ 1423  make clean
+ 1424  make
+ 1425  ./mcgrid 
+ 1426  vim 10input.params 
+ 1427  cp 10input.params input.params 
+ 1428  make clean
+ 1429  make
+ 1430  ./mcgrid 
+ 1431  vim draw.py 
+ 1432  ls
+ 1433  git add .
+ 1434  git commit -m "Better drawing"
+ 1435  vim draw.py 
+ 1436  git checkout delta_t
+ 1437  vim draw.py 
+ 1438  git log --pretty=oneline
+ 1439  git checkout delta_t_no_partial 
+ 1440  git log --pretty=oneline
+ 1441  vim draw.py 
+ 1442  git checkout delta_t
+ 1443  vim draw.py 
+ 1444  ls
+ 1445  git branch
+ 1446  git checkout master
+ 1447  git add .
+ 1448  git commit -m "Better drawing
+ 1449  "
+ 1450  git branch 
+ 1451  git checkout master
+ 1452  ls
+ 1453  vim mcpolar.f90 
+ 1454  google-chrome mcpolar.f90
+ 1455  vim mcpolar.f90 
+ 1456  vim sourceph.f90 
+ 1457  vim density.f90 
+ 1458  ls -la
+ 1459  ls *.f90
+ 1460  git add .
+ 1461  git commit -m "Tidying"
+ 1462  git checkout delta_t
+ 1463  ls
+ 1464  vim mcpolar.f90 
+ 1465  vim tauint2.f90 
+ 1466  exit
+ 1467  exit
+ 1468  ssh ian@Pythonidae
+ 1469  ssh root@Pythonidae
+ 1470  history | grep ssh
+ 1471  echo $HISTSIZE
+ 1472  echo $HISTFILESIZE
+ 1473  ls ~/.ssh/
+ 1474  cat ~/.ssh/known_hosts
+ 1475  vim ~/.ssh/config
+ 1476  vim ~/.bash
+ 1477  vim ~/.bashrc
+ 1478  exit
+ 1479  vim ~/.ssh/config 
+ 1480  ssh irmckenzie
+ 1481  cd Coding/Python/
+ 1482  ls
+ 1483  vim euler23.py
+ 1484  vim euler26.py
+ 1485  ls
+ 1486  cd ml
+ 1487  ls
+ 1488  vim simple_policy_gradient.py
+ 1489  vim cartpole.py
+ 1490  ls
+ 1491  vim simple_policy_gradient.py 
+ 1492  cd ../../fortran/
+ 1493  cd MCRT/
+ 1494  ls
+ 1495  mkdir CLASSTEST
+ 1496  cp iso_sphere.f90 CLASSTEST/
+ 1497  cd CLASSTEST/
+ 1498  vim iso_sphere.f90 
+ 1499  ssh ian@pythonidae
+ 1500  sudo dmidecode
+ 1501  sudo dmidecode | grep aspire
+ 1502  sudo lshw | model
+ 1503  sudo lshw | grep model
+ 1504  sudo lshw
+ 1505  sudo lshw | grep aspire
+ 1506  cd /opt/google/
+ 1507  ls
+ 1508  cd chrome/
+ 1509  ls
+ 1510  ls default_apps/
+ 1511  mv libwidevinecdm.so OLDlibwidevinecdm.so
+ 1512  sudo mv libwidevinecdm.so OLDlibwidevinecdm.so
+ 1513  sudo mv OLDlibwidevinecdm.so libwidevinecdm.so
+ 1514  ls
+ 1515  cd Coding/Python/
+ 1516  ls
+ 1517  cd ml
+ 1518  ls
+ 1519  mkdir spinRL
+ 1520  cd spinRL/
+ 1521  ls
+ 1522  vim 1_simple_pg.py
+ 1523  ls
+ 1524  vim 1_simple_pg.py 
+ 1525  vim cp_1_simple_pg.py
+ 1526  vim cp_1_simple_pg.py 
+ 1527  vim 1_simple_pg.py 
+ 1528  vim rendertest.py
+ 1529  python -m spinup.run ppo --env CartPole-v1 --exp_name hello_world
+ 1530  pip install spinup
+ 1531  python -m spinup.run ppo --env CartPole-v1 --exp_name hello_world
+ 1532  pip install spinup.run
+ 1533  python -m spinup.run ppo --env CartPole-v1 --exp_name hello_world
+ 1534  python -m spinup ppo --env CartPole-v1 --exp_name hello_world
+ 1535  vim spin.py
+ 1536  ls
+ 1537  rm cp_1_simple_pg.py 
+ 1538  vim rendertest.py 
+ 1539  vim 1_simple_pg.py 
+ 1540  python 1_simple_pg.py -render True
+ 1541  python 1_simple_pg.py --render True
+ 1542  python 1_simple_pg.py --render
+ 1543  sudo rpm -e google-chrome
+ 1544  sudo dpkg -e google-chrome
+ 1545  sudo dpkg -e google-chrome-stable
+ 1546  sudo apt-get remove google-chrome-stable
+ 1547  sudo apt-get install google-chrome-stable
+ 1548  cd Downloads/
+ 1549  ls
+ 1550  ls -lat
+ 1551  ./getid_linux 
+ 1552  ls
+ 1553  ls | grep muj
+ 1554  man unzip
+ 1555  unzip mujoco200_linux.zip ~/.mujoco/mujoco200
+ 1556  mkdir ~/.mujoco/mujoco200
+ 1557  sudo mkdir ~/.mujoco/mujoco200
+ 1558  sudo mkdir -r ~/.mujoco/mujoco200
+ 1559  sudo mkdir -R ~/.mujoco/mujoco200
+ 1560  man mkdir
+ 1561  sudo mkdir -p ~/.mujoco/mujoco200
+ 1562  unzip mujoco200_linux.zip ~/.mujoco/mujoco200
+ 1563  unzip mujoco200_linux.zip -d ~/.mujoco/mujoco200
+ 1564  sudo unzip mujoco200_linux.zip -d ~/.mujoco/mujoco200
+ 1565  mv mjkey.txt ~/.mujoco/
+ 1566  sudo mv mjkey.txt ~/.mujoco/
+ 1567  pip install -U 'mujoco-py<2.1,>=2.0'
+ 1568  pip install pep517
+ 1569  pip install -U 'mujoco-py<2.1,>=2.0'
+ 1570  apt install libosmesa6-dev libgl1-mesa-glx libglfw3
+ 1571  pip install -U 'mujoco-py<2.1,>=2.0'
+ 1572  sudo pip install -U 'mujoco-py<2.1,>=2.0'
+ 1573  pip install setuptools
+ 1574  sudo pip install setuptools
+ 1575  pip install mujoco-py
+ 1576  vim ~/.bash
+ 1577  vim ~/.bashrc
+ 1578  :q
+ 1579  exit
+ 1580  cd Coding/Python/ml/
+ 1581  ls
+ 1582  vim fash.py
+ 1583  man pip
+ 1584  pip show
+ 1585  pip list
+ 1586  pip install --upgrade
+ 1587  pip install --upgrade pip
+ 1588  man pip
+ 1589  pip install -U tensorflow
+ 1590  man venv
+ 1591  man virtualenv
+ 1592  man python virtualenv
+ 1593  pip install virtualenv
+ 1594  virtualenv TF1.0
+ 1595  source TF1.0/bin/activate
+ 1596  pip install numpy tensorflow matplotlib
+ 1597  vim fash.py 
+ 1598  ls
+ 1599  cd spinRL/
+ 1600  ls
+ 1601  cd spinningup/
+ 1602  ls
+ 1603  cd spinup/exercises/problem_set_1/
+ 1604  ls
+ 1605  vim exercise1_1.py 
+ 1606  rm .exercise1_1.py.swp 
+ 1607  vim exercise1_
+ 1608  vim exercise1_1.py 
+ 1609  deactivate
+ 1610  vim exercise1_1.py 
+ 1611  cd ../../../../
+ 1612  ls
+ 1613  vim 1_simple_pg.py 
+ 1614  push
+ 1615  pushd
+ 1616  pushd spinningup/spinup/exercises/problem_set_1
+ 1617  ls
+ 1618  vim exercise1_1.py 
+ 1619  ls
+ 1620  cd ../problem_set_1_solutions/
+ 1621  ls
+ 1622  vim exercise1_1_soln.py 
+ 1623  cd ../problem_set_1
+ 1624  vim exercise1_2.py 
+ 1625  vim exercise1_1.py 
+ 1626  vim exercise1_2.py 
+ 1627  vim ~/.bashrc
+ 1628  exit
+ 1629  pip install mujoco-py
+ 1630  sudo apt install gcc
+ 1631  man gcc
+ 1632  gcc hello
+ 1633  sudo apt update gcc
+ 1634  sudo apt-get install -u gcc
+ 1635  pip install mujoco-py
+ 1636  pip install -r requirements.txt
+ 1637  sudo apt-get install libosmesa6-dev
+ 1638  sudo apt-get install libglew-dev
+ 1639  pip install mujoco-py
+ 1640  cd ~/.mujoco/mujoco200/
+ 1641  ls
+ 1642  ls mujoco200_linux/
+ 1643  mv mujoco200_linux/* .
+ 1644  sudo -r mv mujoco200_linux/* .
+ 1645  sudo mv -r mujoco200_linux/* .
+ 1646  man mv
+ 1647  sudo mv mujoco200_linux/* .
+ 1648  ls
+ 1649  rm mujoco200_linux/
+ 1650  rm -r mujoco200_linux/
+ 1651  ls
+ 1652  ls mujoco200_linux/
+ 1653  man rm
+ 1654  rm -d mujoco200_linux/
+ 1655  sudo rm -d mujoco200_linux/
+ 1656  ls
+ 1657  pip install mujoco-py
+ 1658  exit
+ 1659  cd Coding/Python/ml/spinRL/spinningup/spinup/exercises/problem_set_1
+ 1660  ls
+ 1661  vim exercise1_2.py 
+ 1662  vim test.py
+ 1663  pip install --upgrade numpy
+ 1664  vim test.py
+ 1665  rm test.py 
+ 1666  vim exercise1_2.py 
+ 1667  cp exercise1_2.py SOLexercise1_2.py
+ 1668  vim SOLexercise1_2.py 
+ 1669  vim exercise1_1.py 
+ 1670  ls
+ 1671  vim exercise1_2.py 
+ 1672  vim exercise1_3.py 
+ 1673  cd ../../../../
+ 1674  ls
+ 1675  vim 2_rtg_pg.py 
+ 1676  ls
+ 1677  cd Coding/Python/ml
+ 1678  ls
+ 1679  cd spinRL/
+ 1680  ls
+ 1681  vim 1_simple_pg.py 
+ 1682  vim rewritefash.py 
+ 1683  ls spin
+ 1684  ls spinningup/
+ 1685  vim rewritefash.py 
+ 1686  mv rewritefash.py rewrite_1_simple_pg.py
+ 1687  vim rewrite_1_simple_pg.py 
+ 1688  python rewrite_1_simple_pg.py 
+ 1689  vim rewrite_1_simple_pg.py 
+ 1690  vim 1_simple_pg.py 
+ 1691  vim rewrite_1_simple_pg.py 
+ 1692  ls
+ 1693  mv rewrite_2_rtg_pg.py 
+ 1694  mv rewrite_1_simple_pg.py rewrite_2_rtg_pg.py 
+ 1695  vim keras_simple_pg.py 
+ 1696  mv keras_simple_pg.py keras_rtg_pg.py
+ 1697  vim keras_rtg_pg.py 
+ 1698  cd Coding/Python/ml/spinRL/
+ 1699  ls
+ 1700  vim rewrite_2_rtg_pg.py 
+ 1701  vim keras_rtg_pg.py 
+ 1702  cd Coding/Python/
+ 1703  ls
+ 1704  ls -lat
+ 1705  ls -lat | grep qui
+ 1706  cd masters/
+ 1707  ls
+ 1708  vim pebble_game.py 
+ 1709  ls
+ 1710  vim testing.py 
+ 1711  ls
+ 1712  ls -la
+ 1713  vim framework.py 
+ 1714  ls
+ 1715  rm .framework.py.swp 
+ 1716  vim testing.py 
+ 1717  rm .testing.py.swp 
+ 1718  vim testing.py 
+ 1719  vim framework.py 
+ 1720  vim testing.py 
+ 1721  vim framework.py 
+ 1722  man onboard
+ 1723  onboard
+ 1724  asd
+ 1725  
+ 1726  cd Coding/Python/masters/
+ 1727  ls
+ 1728  ls -la
+ 1729  man ls
+ 1730  ls -toAh
+ 1731  man ls
+ 1732  vim testing.py 
+ 1733  ls
+ 1734  vim constructive_pebble_game.py 
+ 1735  ls -toAh
+ 1736  git list
+ 1737  git branch
+ 1738  git log
+ 1739  man git log
+ 1740  git log --pretty=oneline
+ 1741  ls
+ 1742  vim delaunay_test.py 
+ 1743  vim constructive_pebble_game.py 
+ 1744  ls
+ 1745  git log --pretty=oneline
+ 1746  git checkout 189d2b3bc51:testing.py > old_testing.py
+ 1747  git show 189d2b3bc51:testing.py > old_testing.py
+ 1748  ls
+ 1749  vim old_testing.py 
+ 1750  ls
+ 1751  vim nice_results/
+ 1752  cd nice_results/
+ 1753  ls
+ 1754  google-chrome .
+ 1755  google-chrome *
+ 1756  cd ..
+ 1757  vim framework.py 
+ 1758  cd component_images/
+ 1759  ls
+ 1760  cd ..
+ 1761  ls
+ 1762  vim old_testing.py 
+ 1763  git show 189d2b3bc51:testing.py > old_testing.py
+ 1764  vim old_testing.py 
+ 1765  cd component_images/
+ 1766  ls
+ 1767  open edge0.png
+ 1768  edge0.png
+ 1769  image
+ 1770  view
+ 1771  ximage
+ 1772  apt list |grep image
+ 1773  xbimage
+ 1774  bximage
+ 1775  cd ..
+ 1776  vim component_experiment.py 
+ 1777  vim constructive_pebble_game.py 
+ 1778  vim testing.py 
+ 1779  ls
+ 1780  google-chrome stress.png
+ 1781  cd Coding/Python/
+ 1782  ls
+ 1783  mkdir datamining
+ 1784  cd datamining/
+ 1785  ls
+ 1786  jupyter notebook
+ 1787  cd Coding/Python/datamining/
+ 1788  ls
+ 1789  cd datasets/
+ 1790  ls
+ 1791  cd housing/
+ 1792  ls
+ 1793  cd ../../
+ 1794  cd datasets/housing/
+ 1795  ls
+ 1796  cd Coding/Python/datamining/
+ 1797  ls
+ 1798  ls datasets/
+ 1799  cd ..
+ 1800  cd Coding/
+ 1801  ls
+ 1802  cd Python/
+ 1803  ls
+ 1804  cd datamining/
+ 1805  ls
+ 1806  python3 -m venv virtualenv
+ 1807  source virtualenv/bin/activate
+ 1808  ls
+ 1809  jupyter notebook 
+ 1810  cd Coding/Python/datamining/lab
+ 1811  ls
+ 1812  cd ..
+ 1813  ls
+ 1814  mv Untitled.ipynb lab/
+ 1815  cd lab/
+ 1816  ls data
+ 1817  cd ..
+ 1818  ls
+ 1819  cd datasets/ppd
+ 1820  ls
+ 1821  wcwc -l filename
+ 1822  wc -l pp-complete.csv
+ 1823  cd Coding/Python/datamining/
+ 1824  source virtualenv/bin/activate
+ 1825  python3 -m pip
+ 1826  python3 -m pip --upgrade
+ 1827  python3 -m pip install --upgrade
+ 1828  python3 -m pip install scikit-learn numpy pandas scipy matplotlib jupyter
+ 1829  pip instlal --upgrade pip
+ 1830  pip install --upgrade pip
+ 1831  jupyter notebook
+ 1832  cd Coding/Python/datamining/hw1/
+ 1833  ls
+ 1834  jupyter notebook Homework1.ipynb 
+ 1835  cd Coding/Python/datamining/datasets/ppd/
+ 1836  ls
+ 1837  wc -l pp-complete.csv
+ 1838  exit
+ 1839  cd Coding/Python/datamining/
+ 1840  ls
+ 1841  jupyter notebook
+ 1842  y
+ 1843  jupyter notebook
+ 1844  cd Coding/Python/datamining/
+ 1845  pip install --upgrade sklearn
+ 1846  python
+ 1847  exit
+ 1848  conda update sklearn
+ 1849  conda update scikit-learn
+ 1850  pip update scikit-learn
+ 1851  pip install --upgrade scikit-learn
+ 1852  conda install --upgrade sklearn
+ 1853  man conda
+ 1854  conda install sklearn
+ 1855  vim ./bashrc
+ 1856  vim ~/.bashrc
+ 1857  apt-get install libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6
+ 1858  sudo apt-get install libgl1-mesa-glx libegl1-mesa libxrandr2 libxrandr2 libxss1 libxcursor1 libxcomposite1 libasound2 libxi6 libxtst6
+ 1859  bash ~/Downloads/Anaconda3-2019.10-Linux-x86_64.sh
+ 1860  exit
+ 1861  cd Coding/Python/datamining/
+ 1862  jupyter notebook
+ 1863  sudo pip install --upgrade sklearn
+ 1864  jupyter notebook
+ 1865  ls ~
+ 1866  cd ~
+ 1867  dir
+ 1868  pwd
+ 1869  ls -la
+ 1870  echo $PATH
+ 1871  rm -f /home/ian/bin/anaconda3/
+ 1872  rm -rf /home/ian/bin/anaconda3/
+ 1873  exit
+ 1874  jupyter notebook
+ 1875  conda update scikit-learn
+ 1876  conda
+ 1877  conda search scikit-learn
+ 1878  exit
+ 1879  cd Coding/Python/datamining/
+ 1880  jupyter notebook
+ 1881  conda install scikit-learn
+ 1882  conda update --all
+ 1883  jupyter notebook
+ 1884  exit
+ 1885  jupyter notebook
+ 1886  y
+ 1887  ls
+ 1888  cd Coding/Python/datamining/
+ 1889  ls
+ 1890  cd ..
+ 1891  ls -oAh
+ 1892  ls -oaH
+ 1893  du -c datamining/
+ 1894  du -ch datamining/
+ 1895  cd datamining/
+ 1896  cd hw1/
+ 1897  ls
+ 1898  git init
+ 1899  git ad d.
+ 1900  git add .
+ 1901  git commit -m "First commit"
+ 1902  git remote add origin https://github.com/naimenz/datamininghw1.git
+ 1903  git remote -v
+ 1904  git push origin master
+ 1905  cd Coding/Python/masters/
+ 1906  ls
+ 1907  git add .
+ 1908  git commit -m "Getting up to date"
+ 1909  git push
+ 1910  cd ..
+ 1911  ls
+ 1912  cd datamining/
+ 1913  ls
+ 1914  vim ../IEG.py 
+ 1915  vim ../quined.py 
+ 1916  cd ../masters/
+ 1917  ls
+ 1918  git log
+ 1919  git log --pretty=oneline
+ 1920  vim testing.py 
+ 1921  ls
+ 1922  vim testing.py 
+ 1923  cd Certificate/
+ 1924  ls
+ 1925  cd ..
+ 1926  mv Certificate/ certificate/
+ 1927  ls
+ 1928  cd certificate/ Certificate/
+ 1929  mv certificate/ Certificate/
+ 1930  mv Coding/ coding/
+ 1931  cd coding/
+ 1932  mv Project\ Hand-in\ Ian hand-in Ian
+ 1933  mv Project\ Hand-in\ Ian hand-in\ Ian/
+ 1934  mv Python/ python/
+ 1935  mv ml/ ML/
+ 1936  cd python/
+ 1937  mv ml/ ML/
+ 1938  ls myproject/
+ 1939  mv myproject/ Myproject/
+ 1940  cd masters/
+ 1941  cd ~
+ 1942  cd
+ 1943  cd coding/
+ 1944  cd
+ 1945  cd coding/python/masters/
+ 1946  ls
+ 1947  vim framework.py 
+ 1948  cd ..
+ 1949  ls
+ 1950  cd datamining/
+ 1951  ls
+ 1952  mkdir HW2
+ 1953  cd HW2/
+ 1954  git checkout https://github.com/naimenz/ID5059-Group-Project.git
+ 1955  man git checkout
+ 1956  
+ 1957  man git init
+ 1958  git clone naimenz@https://github.com/naimenz/ID5059-Group-Project.git
+ 1959  git clone https://github.com/naimenz/ID5059-Group-Project.git
+ 1960  ls
+ 1961  cd ID5059-Group-Project/
+ 1962  ls
+ 1963  jupyter notebook
+ 1964  ls
+ 1965  exit
+ 1966  cd coding/python/datamining/HW2/
+ 1967  ls
+ 1968  mkdir data
+ 1969  vim .gitignore
+ 1970  mv .gitignore ID5059-Group-Project/
+ 1971  cd ID5059-Group-Project/
+ 1972  ls -a
+ 1973  cd ..
+ 1974  ls
+ 1975  rm data
+ 1976  rm -R data
+ 1977  ls
+ 1978  cd ID5059-Group-Project/
+ 1979  ls
+ 1980  mkdir data
+ 1981  ls
+ 1982  cd data/
+ 1983  ls
+ 1984  unzip porto-seguro-safe-driver-prediction.zip 
+ 1985  ls
+ 1986  rm porto-seguro-safe-driver-prediction.zip 
+ 1987  cd ..
+ 1988  jupyter notebook
+ 1989  cd coding/python/datamining/HW2/ID5059-Group-Project/data/
+ 1990  ls
+ 1991  cd coding/python/masters/
+ 1992  ls
+ 1993  vim 2animationtesting.py 
+ 1994  exit
+ 1995  pulseaudio -k
+ 1996  sudo service pulseaudio restart
+ 1997  sudo also force-reload
+ 1998  sudo alsa force-reload
+ 1999  cd coding/python/masters/
+ 2000  ls
+ 2001  vim testing.py 
+ 2002  cp testing.py test2.py
+ 2003  vim test2.py 
+ 2004  git add *
+ 2005  git commit -m "Testing files are ordered network experiments"
+ 2006  git push 
+ 2007  cd
+ 2008  cd coding/masters/
+ 2009  ls
+ 2010  cd spherepacking/
+ 2011  ls
+ 2012  mkdir ianpacking
+ 2013  cd ianpacking/
+ 2014  vim packing.py
+ 2015  ls
+ 2016  cd images/
+ 2017  ls
+ 2018  cd ..
+ 2019  vim packing.py 
+ 2020  python packing.py 
+ 2021  history > less

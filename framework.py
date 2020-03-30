@@ -370,7 +370,6 @@ def exts_to_strains(fw, exts):
     edge_list = sorted(fw.edges)
     for i in range(Nb):
         strains[i] = exts[i] / fw.edges[edge_list[i]]["length"]
-
     return strains
         
 # implementing the cost function on strains as in the paper
@@ -385,7 +384,7 @@ def cost_f(ns, nstars):
     return cost
 
 # borrowing heavily from draw_tensions, trying to draw the strains on the bonds
-def draw_strains(fw, strains,ghost=False, filename=None):
+def draw_strains(fw, strains, ghost=False, filename=None):
     # works on a numpy array
     strains = np.array(strains)
     # drawing the nodes of the graph
@@ -398,6 +397,8 @@ def draw_strains(fw, strains,ghost=False, filename=None):
     e_labels=dict()
     for i, edge in enumerate(sorted(fw.edges)):
         e_labels[edge] = np.round(strains[i], 4)
+
+    print(e_labels)
        
     cmap = plt.cm.coolwarm
     nx.draw(fw, pos, edge_color=strains,
