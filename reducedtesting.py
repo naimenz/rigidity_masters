@@ -34,14 +34,14 @@ draw_strains(fw, strains, ghost=True)
 s_max = strains[edge_dict[source]]
 # number of frames in the animation
 n = 60
-# for i in range(n):
-#     strain_val = 0.4 *s_max * (i/(n-1))
-#     print("target strain val",strain_val)
-#     constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
-#     u0 = np.zeros(len(fw.nodes) * 2)
-#     mind = minimize(energy, u0, args=(fw), constraints=constraints)
-#     # print("minimized energy",mind.fun)
-#     print("minimiser:",mind)
-#     draw_framework(update_pos(fw, mind.x), filename="anim2/anim_"+str(i)+".png",ghost=True)
-#     plt.close()
-#     print("drawn",i+1,"images of",n)
+for i in range(n):
+    strain_val = 0.4 *s_max * (i/(n-1))
+    print("target strain val",strain_val)
+    constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
+    u0 = np.zeros(len(fw.nodes) * 2)
+    mind = minimize(energy, u0, args=(fw), constraints=constraints)
+    # print("minimized energy",mind.fun)
+    print("minimiser:",mind)
+    draw_framework(update_pos(fw, mind.x), filename="anim2/anim_"+str(i)+".png",ghost=True)
+    plt.close()
+    print("drawn",i+1,"images of",n)

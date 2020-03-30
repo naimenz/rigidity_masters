@@ -13,8 +13,8 @@ from scipy.optimize import linprog
 # NOTE: sorts the edges before adding them to the graph
 def create_structure_graph(nodes, edges):
     g = nx.Graph()
-    g.add_nodes_from(sorted(nodes))
-    g.add_edges_from(sorted(edges))
+    g.add_nodes_from(nodes)
+    g.add_edges_from(edges)
     return g
 
 # add an embedding to a structure graph, creating a framework
@@ -63,7 +63,7 @@ def add_lengths_and_stiffs(fw):
 # because lam=1, and the diag is 1/ki = 1/(lam/length), we just get a diagonal matrix of lengths
 # NOTE: I don't know what to do about 0 stiffness, so atm i'll just set it to 0 manually
 def flex_mat(fw):
-    entries = [fw.edges[edge]["length"]/fw.edges[edge]["lam"] if fw.edges[edge]["lam"]!= 0 else 0 for edge in sorted(fw.edges)]
+    entries = [fw.edges[edge]["length"]/fw.edges[edge]["lam"] if fw.edges[edge]["lam"]!= 0 else 0 for edge in fw.edges]
     return np.diag(entries)
 
 # convert a delaunay object into a list of edges that can be used to create a framework
@@ -226,9 +226,9 @@ def rig_mat(fw, d=2):
     n = len(list(fw))
     e = len(edgeview)
     M = np.zeros((e, d*n))
-    # print("SORTED",sorted(edgeview))
+    # print("SORTED",edgeview)
         
-    for row, edge in enumerate(sorted(edgeview)):
+    for row, edge in enumerate(edgeview):
         i,j = edge
         pos1 = nodeview[i]["position"]
         pos2 = nodeview[j]["position"]
@@ -311,7 +311,7 @@ def draw_tensions(fw, f):
     pos = {node: nodeview[node]["position"] for node in nodeview}
 
     e_labels=dict()
-    for i, edge in enumerate(sorted(fw.edges)):
+    for i, edge in enumerate(fw.edges):
         e_labels[edge] = np.round(s[i], 4)
 
     # places where the force is being applied will be coloured green
@@ -352,7 +352,7 @@ def all_extensions(fw, tstar):
     exts = []
     R = rig_mat(fw,2)
     Rt = R.T
-    for edge in sorted(fw.edges):
+    for edge in fw.edges:
         fwc = fw.copy()  
         fwc.edges[edge]["lam"] = 0
         F = flex_mat(fwc)
@@ -367,7 +367,7 @@ def all_extensions(fw, tstar):
 def exts_to_strains(fw, exts):
     Nb = len(exts)
     strains = [0]*Nb
-    edge_list = sorted(fw.edges)
+    edge_list = list(fw.edges)
     for i in range(Nb):
         strains[i] = exts[i] / fw.edges[edge_list[i]]["length"]
     return strains
@@ -395,7 +395,7 @@ def draw_strains(fw, strains, ghost=False, filename=None):
     pos = {node: nodeview[node]["position"] for node in nodeview}
 
     e_labels=dict()
-    for i, edge in enumerate(sorted(fw.edges)):
+    for i, edge in enumerate(fw.edges):
         e_labels[edge] = np.round(strains[i], 4)
 
     print(e_labels)
@@ -404,7 +404,7 @@ def draw_strains(fw, strains, ghost=False, filename=None):
     nx.draw(fw, pos, edge_color=strains,
             width=4, edge_cmap=cmap, edge_vmin=-max(abs(strains)), edge_vmax=max(abs(strains)), with_labels=True)
     if ghost:
-        ghost_es = set([edge for edge in sorted(fw.edges) if fw.edges[edge]["lam"]==0])
+        ghost_es = set([edge for edge in fw.edges if fw.edges[edge]["lam"]==0])
         nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed")
     nx.draw_networkx_edge_labels(fw, pos, e_labels)
 
@@ -414,7 +414,7 @@ def draw_strains(fw, strains, ghost=False, filename=None):
 
 def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False):
     fw = fw_orig.copy()
-    edge_dict = {edge: i for i, edge in enumerate(sorted(fw.edges))}
+    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
 
     # modifying the framework to change two bonds to ghost bonds (source and target)
     fw.edges[source]["lam"] = 0
@@ -439,7 +439,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
             costs.append(cost_f(ns, nstars))
         min_cost = min(costs)
         index_to_remove = costs.index(min_cost)
-        edge_to_remove = sorted(fw.edges)[index_to_remove]
+        edge_to_remove = list(fw.edges)[index_to_remove]
         fw.edges[edge_to_remove]["lam"] = 0
         print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
         it+=1
@@ -457,7 +457,7 @@ def energy(u, *args):
     fw = args[0]
     energy = 0
     # looping over all bonds in the network
-    for edge in sorted(fw.edges):
+    for edge in fw.edges:
         i = edge[0]
         j = edge[1]
         posi = np.array(fw.nodes[i]["position"])
@@ -480,7 +480,7 @@ def source_strain(u, *args):
     val = args[2]
 
     # dict to get edge index from name
-    edge_dict = {edge: i for i, edge in enumerate(sorted(fw.edges))}
+    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
     # getting the rigidity matrix (Q^T) to calculate extensions from displacement
     R = rig_mat(fw)
     exts = R.dot(u)
