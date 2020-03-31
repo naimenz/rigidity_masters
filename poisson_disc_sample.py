@@ -1,3 +1,6 @@
+# ============================================================================== 
+# Did I write this myself? I'm starting to think so
+# ============================================================================== 
 import numpy as np
 
 # calculate the euclidean distance between two points
