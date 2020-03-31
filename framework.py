@@ -384,7 +384,7 @@ def cost_f(ns, nstars):
     return cost
 
 # borrowing heavily from draw_tensions, trying to draw the strains on the bonds
-def draw_strains(fw, strains, ghost=False, filename=None):
+def draw_strains(fw, strains, source=None, target=None, ghost=False, filename=None):
     # works on a numpy array
     strains = np.array(strains)
     # drawing the nodes of the graph
@@ -396,17 +396,21 @@ def draw_strains(fw, strains, ghost=False, filename=None):
 
     e_labels=dict()
     for i, edge in enumerate(fw.edges):
-        e_labels[edge] = np.round(strains[i], 4)
+        e_labels[edge] = np.round(strains[i], 1)
 
-    print(e_labels)
-       
     cmap = plt.cm.coolwarm
-    nx.draw(fw, pos, edge_color=strains,
+    nx.draw_networkx_edges(fw, pos, edgelist=fw.edges, edge_color=strains,
             width=4, edge_cmap=cmap, edge_vmin=-max(abs(strains)), edge_vmax=max(abs(strains)), with_labels=True)
     if ghost:
         ghost_es = set([edge for edge in fw.edges if fw.edges[edge]["lam"]==0])
         nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed")
-    nx.draw_networkx_edge_labels(fw, pos, e_labels)
+    if source and target:
+        nx.draw_networkx_nodes(fw, pos, nodelist=source, node_color="g")
+        nx.draw_networkx_nodes(fw, pos, nodelist=target, node_color="r")
+
+       
+    bbox = dict(boxstyle="round", alpha=0.0)
+    nx.draw_networkx_edge_labels(fw, pos, e_labels, font_size=6, bbox=bbox)
 
     if filename:
         fig.savefig(filename, bbox_inches='tight')
@@ -425,7 +429,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
     strains = exts_to_strains(fw, extensions(fw, tensions))
     print("initial strain ratio:",strains[edge_dict[target]]/strains[edge_dict[source]])
     if draw:
-        draw_strains(fw, strains, ghost=True)
+        draw_strains(fw, strains, source, target, ghost=True)
 
     # calculating ns test
     it = 0
