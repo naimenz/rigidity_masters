@@ -22,26 +22,37 @@ fw = add_lengths_and_stiffs(fw)
 # test of creating a dictionary to keep track of edges
 edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
 
+# fw = tune_network(fw, source, target, tension=1, nstars=nstars, draw=True)
+fw.edges[source]["lam"] = 0
+fw.edges[target]["lam"] = 0
+# what the above does is remove the following two bonds:
+rem_edges = [(132,181), (187,188),(91,191),(130,179),(188,190),(65,66),
+        (143,195),(179,180),(176,177),(49,50),(79,104),(30,32),(71,110),(71,99),(110,159),(97,100),(11,28),(1,8),(160,186)]
+for edge in rem_edges:
+    fw.edges[edge]["lam"] = 0
 
-fw = tune_network(fw, source, target, tension=1, nstars=nstars, draw=True)
 tensions = [0]*len(fw.edges)
 tensions[edge_dict[source]] = 1
-strains = exts_to_strains(fw, extensions(fw, tensions))
+# trying tension on neighbouring bonds
+# tensions[edge_dict[(195,199)]] = 1
+exts = extensions(fw, tensions, True)
+print("ext on source, target resp.", exts[edge_dict[source]], exts[edge_dict[target]])
+strains = exts_to_strains(fw, exts)
 print("strains on source, target resp.",strains[edge_dict[source]], strains[edge_dict[target]])
 draw_strains(fw, strains, source, target, ghost=True)
 
 # # getting the max strain on the source edge
-# s_max = strains[edge_dict[source]]
+s_max = 2# strains[edge_dict[source]]
 # # number of frames in the animation
-# n = 60
-# for i in range(n):
-#     strain_val = 0.4 *s_max * (i/(n-1))
-#     print("target strain val",strain_val)
-#     constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
-#     u0 = np.zeros(len(fw.nodes) * 2)
-#     mind = minimize(energy, u0, args=(fw), constraints=constraints)
-#     # print("minimized energy",mind.fun)
-#     print("minimiser:",mind)
-#     draw_framework(update_pos(fw, mind.x), filename="anim2/anim_"+str(i)+".png",ghost=True)
-#     plt.close()
-#     print("drawn",i+1,"images of",n)
+n = 30
+for i in range(n):
+    strain_val = 0.4 *s_max * (i/(n-1))
+    print("target strain val",strain_val)
+    constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
+    u0 = np.zeros(len(fw.nodes) * 2)
+    mind = minimize(energy, u0, args=(fw), constraints=constraints)
+    # print("minimized energy",mind.fun)
+    print("minimiser:",mind)
+    draw_framework(update_pos(fw, mind.x), filename="images/anim2/anim_"+str(i)+".png",ghost=True)
+    plt.close()
+    print("drawn",i+1,"images of",n)

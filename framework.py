@@ -157,13 +157,17 @@ def create_reduced_fw(n, r, seed=None):
 
 # if filename, an image is saved
 # if ghost, draw the ghost bonds (lam=0) a different colour
-def draw_framework(fw, filename=None, ghost=False):
+def draw_framework(fw, filename=None, ghost=False, source=None, target=None):
     nodeview = fw.nodes
     fig, ax = plt.subplots(figsize=(20,10))
     ax.set_aspect('equal')
     pos = {node: nodeview[node]["position"] for node in nodeview}
     nx.draw_networkx_nodes(fw, pos, with_labels=True)
     nx.draw_networkx_labels(fw,pos)
+    if source:
+        nx.draw_networkx_nodes(fw, pos, nodelist=source, node_color="g")
+    if target:
+        nx.draw_networkx_nodes(fw, pos, nodelist=target, node_color="r")
 
     # draw edges, with or without care for ghost edges
     if ghost:
@@ -171,7 +175,6 @@ def draw_framework(fw, filename=None, ghost=False):
         other_es = set(fw.edges) - ghost_es
         nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed", with_labels=True)
         nx.draw_networkx_edges(fw, pos, edgelist=other_es, with_labels=True)
-
     else:
         nx.draw_networkx_edges(fw, pos, with_labels=True)
 
@@ -338,13 +341,22 @@ def draw_tensions(fw, f):
     plt.show()
     
 # get extensions from applied tension to framework
-def extensions(fw, tstar):
+def extensions(fw, tstar, debug=False):
     R = rig_mat(fw,2)
     Rt = R.T
     F = flex_mat(fw)
     Finv = np.linalg.pinv(F)
+    
+
     H = Rt.dot(Finv).dot(R)
     Hinv = np.linalg.pinv(H)
+    # TESTING BIGGER RCOND
+    # Hinv = np.linalg.pinv(H, rcond=1e-1)
+    if debug:
+        print("MEAN:",np.mean(np.abs(Hinv)))
+    # trying to figure out why the numbers are so big
+    # print("allclose?",np.allclose(H, np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
+    # print("allclose?",np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv))))#, rtol=1e-3))
     return R.dot(Hinv.dot(Rt).dot(tstar))
 
 # test function to see if I can work out the extensions from removing each edge
@@ -359,6 +371,12 @@ def all_extensions(fw, tstar):
         Finv = np.linalg.pinv(F)
         H = Rt.dot(Finv).dot(R)
         Hinv = np.linalg.pinv(H)
+        # TESTING BIGGER RCOND
+        # Hinv = np.linalg.pinv(H, rcond=1e-1)
+        # Hinv = np.linalg.pinv(H, rcond=1e-10)
+        # if not (np.allclose(H, np.dot(H, np.dot(Hinv, H))) and np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv)))):
+        #     print("allclose?",np.allclose(H, np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
+        #     print("allclose?",np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv))))#, rtol=1e-3))
         exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
     return exts
 
@@ -404,18 +422,36 @@ def draw_strains(fw, strains, source=None, target=None, ghost=False, filename=No
     if ghost:
         ghost_es = set([edge for edge in fw.edges if fw.edges[edge]["lam"]==0])
         nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed")
-    if source and target:
+    if source:
         nx.draw_networkx_nodes(fw, pos, nodelist=source, node_color="g")
+    if target:
         nx.draw_networkx_nodes(fw, pos, nodelist=target, node_color="r")
 
        
-    bbox = dict(boxstyle="round", alpha=0.0)
-    nx.draw_networkx_edge_labels(fw, pos, e_labels, font_size=6, bbox=bbox)
+    # bbox = dict(boxstyle="round", alpha=0.0)
+    nx.draw_networkx_edge_labels(fw, pos, e_labels, font_size=6)#, bbox=bbox)
 
     if filename:
         fig.savefig(filename, bbox_inches='tight')
     plt.show()
 
+# NOTE: Test to see if there is numerical error in cost
+def calc_true_cost(fw_orig, source, target, nstars, tension=1):
+    fw = fw_orig.copy()
+    rem_edges = [edge for edge in fw.edges if (fw.edges[edge]["lam"] == 0 and (edge != source and edge != target))]
+    fw.remove_edges_from(rem_edges)
+    print("true len",len(fw.edges))
+    # new edge dict for smaller framework
+    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+    tensions = [0]*len(fw.edges)
+    tensions[edge_dict[source]] = tension
+    strains = exts_to_strains(fw, extensions(fw, tensions))
+    ns = [strains[edge_dict[target]] / strains[edge_dict[source]]]
+    true_cost = cost_f(ns, nstars)
+    return true_cost
+
+
+# Run the tuning algorithm on a network for a given source, target, ratio
 def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False):
     fw = fw_orig.copy()
     edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
@@ -445,7 +481,13 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         index_to_remove = costs.index(min_cost)
         edge_to_remove = list(fw.edges)[index_to_remove]
         fw.edges[edge_to_remove]["lam"] = 0
+        # test to see numerical error
+        print("fake len",len(fw.edges))
+        true_cost = calc_true_cost(fw, source, target, nstars, tension)
+
         print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+        print("true cost:",true_cost)
+        print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
         it+=1
 
     return fw
