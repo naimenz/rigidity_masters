@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import networkx as nx
 import numpy as np
-import scipy.linalg as lin
+import scipy
 import poisson_disc_sample as pd
 
 from scipy.spatial import Delaunay
@@ -42,6 +42,8 @@ def create_framework(nodes, edges, positions):
 
 # get the lengths of each edge in the framework 
 # also add bulk modulus (lambda) of 1
+# NOTE: I have no clue which modulus we're talking about,
+# but I now assume it's the Young's modulus
 def add_lengths_and_stiffs(fw):
     # create a copy to add the lengths to and to return
     rv = fw.copy()
@@ -249,7 +251,7 @@ def rig_mat(fw, d=2):
 # creates the rigidity matrix with its nullspace appended as rows beneath
 def create_augmented_rigidity_matrix(fw, d):
     M = rig_mat(fw, d=2)
-    null = lin.null_space(M)
+    null = scipy.linalg.null_space(M)
     R = np.vstack((M, null.T))
     return R
 
@@ -346,17 +348,27 @@ def extensions(fw, tstar, debug=False):
     Rt = R.T
     F = flex_mat(fw)
     Finv = np.linalg.pinv(F)
+    # Finv = scipy.linalg.pinv2(F)
     
-
     H = Rt.dot(Finv).dot(R)
     Hinv = np.linalg.pinv(H)
+    # Hinv = scipy.linalg.pinv2(H)#, rcond=1e-2)
     # TESTING BIGGER RCOND
     # Hinv = np.linalg.pinv(H, rcond=1e-1)
     if debug:
-        print("MEAN:",np.mean(np.abs(Hinv)))
-    # trying to figure out why the numbers are so big
-    # print("allclose?",np.allclose(H, np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
-    # print("allclose?",np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv))))#, rtol=1e-3))
+        # trying to figure out why the numbers are so big
+        # print("allclose?",np.allclose(H , np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
+        # print("diff?",(H - np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
+        # print("allclose?",np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv))))#, rtol=1e-3))
+        # print("MEAN:",np.mean(np.abs(Hinv)))
+        # print("LHS:",Rt.dot(tstar))
+        u = Hinv.dot(Rt).dot(tstar)
+        # print("H:",list(H))
+        # plt.imshow(H)
+        # plt.show()
+        # print("RHS:", H.dot(u))
+        # print("disps:",u)
+        # print("Hu == Qt*:", (H.dot(u)- Rt.dot(tstar)))
     return R.dot(Hinv.dot(Rt).dot(tstar))
 
 # test function to see if I can work out the extensions from removing each edge
@@ -369,8 +381,11 @@ def all_extensions(fw, tstar):
         fwc.edges[edge]["lam"] = 0
         F = flex_mat(fwc)
         Finv = np.linalg.pinv(F)
+        # Finv = scipy.linalg.pinv2(F)
         H = Rt.dot(Finv).dot(R)
+        
         Hinv = np.linalg.pinv(H)
+        # Hinv = scipy.linalg.pinv2(H)#, rcond=1e-2)
         # TESTING BIGGER RCOND
         # Hinv = np.linalg.pinv(H, rcond=1e-1)
         # Hinv = np.linalg.pinv(H, rcond=1e-10)
@@ -448,6 +463,11 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
     strains = exts_to_strains(fw, extensions(fw, tensions))
     ns = [strains[edge_dict[target]] / strains[edge_dict[source]]]
     true_cost = cost_f(ns, nstars)
+    # remove another two edges to check rank
+    # fw.remove_edges_from([source,target])
+    # R = rig_mat(fw,2)
+    # rank = np.linalg.matrix_rank(R)
+    # print("rank of R:",rank, "2n - 3:", 2*len(fw.nodes) - 3, "number of edges:",len(fw.edges))
     return true_cost
 
 
@@ -462,7 +482,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
 
     tensions = [0]*len(fw.edges)
     tensions[edge_dict[source]] = tension
-    strains = exts_to_strains(fw, extensions(fw, tensions))
+    strains = exts_to_strains(fw, extensions(fw, tensions, debug=True))
     print("initial strain ratio:",strains[edge_dict[target]]/strains[edge_dict[source]])
     if draw:
         draw_strains(fw, strains, source, target, ghost=True)
@@ -545,3 +565,38 @@ def update_pos(fw, u):
         fwc.nodes[i]["position"] = new_pos
 
     return fwc
+
+# # getting the max strain on the source edge
+def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
+    # # number of frames in the animation
+    n = 30
+    real_ratios_list = []
+    edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+    tensions = [0]*len(fw.edges)
+    tensions[edge_dict[source]] = 1
+    u0 = np.zeros(len(fw.nodes) * 2)
+    for i in range(n):
+        strain_val = 0.5 *s_max * (i/(n-1))
+        print("=========== ITERATION",str(i),"============")
+        print("target strain val:",strain_val)
+        constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
+        mind = minimize(energy, u0, args=(fw), constraints=constraints)
+        print("minimized energy, success, and # iterations:",mind.fun, mind.success,mind.nit)
+        # using solution of prev it for start of next
+        u0 = mind.x
+        real_exts = rig_mat(fw).dot(u0)
+        real_strains = exts_to_strains(fw, real_exts)
+        real_ratio = real_strains[edge_dict[target]]/real_strains[edge_dict[source]]
+        if real_ratio != np.nan:
+            real_ratios_list.append(real_ratio)
+        print("full nonlinear strain ratio:", real_ratio)
+        draw_framework(update_pos(fw, mind.x), filename=fileroot+"anim_"+str(i)+".png",ghost=True, source=source, target=target)
+        plt.close()
+        print("drawn",i+1,"images of",n)
+
+    fig = plt.figure()
+    plt.plot(real_ratios_list)
+    plt.axhline(nstars[0],linestyle="--")
+    plt.show()
+    fig.savefig(fileroot+"ratio.png",bbox_inches="tight")
+    return real_ratios_list
