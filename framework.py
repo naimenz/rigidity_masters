@@ -9,6 +9,8 @@ from scipy.spatial import Delaunay
 from scipy.optimize import minimize
 from scipy.optimize import linprog
 
+import sys
+
 # simple function wrapping graph creation in nx
 # NOTE: sorts the edges before adding them to the graph
 def create_structure_graph(nodes, edges):
@@ -44,7 +46,7 @@ def create_framework(nodes, edges, positions):
 # also add bulk modulus (lambda) of 1
 # NOTE: I have no clue which modulus we're talking about,
 # but I now assume it's the Young's modulus
-def add_lengths_and_stiffs(fw):
+def add_lengths_and_stiffs(fw, lam=1):
     # create a copy to add the lengths to and to return
     rv = fw.copy()
     for edge in rv.edges:
@@ -57,7 +59,8 @@ def add_lengths_and_stiffs(fw):
             l += (pos1[i] - pos2[i])**2
         l = np.sqrt(l)
         rv.edges[edge]["length"] = l
-        rv.edges[edge]["lam"] = 1
+        rv.edges[edge]["lam"] = lam
+        rv.graph["k"] = 1/lam
     return rv
 
 # generate the flexibility matrix (as defined in The Paper)
@@ -65,8 +68,28 @@ def add_lengths_and_stiffs(fw):
 # because lam=1, and the diag is 1/ki = 1/(lam/length), we just get a diagonal matrix of lengths
 # NOTE: I don't know what to do about 0 stiffness, so atm i'll just set it to 0 manually
 def flex_mat(fw):
-    entries = [fw.edges[edge]["length"]/fw.edges[edge]["lam"] if fw.edges[edge]["lam"]!= 0 else 0 for edge in fw.edges]
+    es = fw.edges
+    entries = [es[edge]["length"]/es[edge]["lam"] if es[edge]["lam"]!= 0 else 0 for edge in es]
+    # entries = [fw.edges[edge]["length"]/fw.edges[edge]["lam"] for edge in fw.edges]
     return np.diag(entries)
+
+# the square root of the flex matrix
+def Fhalf_mat(fw):
+    F = flex_mat(fw)
+    return np.sqrt(F)
+
+# in the scaled version, all edges have length 1, so it's just 1/lam
+def F_bar_mat(fw):
+    es = fw.edges
+    entries = [1/es[edge]["lam"] if es[edge]["lam"]!= 0 else 0 for edge in es]
+    return np.diag(entries)
+
+def Q_bar_mat(fw):
+    Fhalf_inv = np.linalg.pinv(Fhalf_mat(fw))
+    R = rig_mat(fw)
+    Q_bar = R.T.dot(Fhalf_inv)
+    return Q_bar
+    
 
 # convert a delaunay object into a list of edges that can be used to create a framework
 def delaunay_to_edges(d):
@@ -159,10 +182,11 @@ def create_reduced_fw(n, r, seed=None):
 
 # if filename, an image is saved
 # if ghost, draw the ghost bonds (lam=0) a different colour
-def draw_framework(fw, filename=None, ghost=False, source=None, target=None):
+def draw_framework(fw, filename=None, ghost=False, source=None, target=None, equal=True):
     nodeview = fw.nodes
     fig, ax = plt.subplots(figsize=(20,10))
-    ax.set_aspect('equal')
+    if equal:
+        ax.set_aspect('equal')
     pos = {node: nodeview[node]["position"] for node in nodeview}
     nx.draw_networkx_nodes(fw, pos, with_labels=True)
     nx.draw_networkx_labels(fw,pos)
@@ -342,34 +366,133 @@ def draw_tensions(fw, f):
     # fig.savefig("stress.png")
     plt.show()
     
-# get extensions from applied tension to framework
-def extensions(fw, tstar, debug=False):
+
+# get applied forces from applied tension
+def forces(fw, tstar):
+    R = rig_mat(fw, 2)
+    Rt = R.T
+    f = Rt.dot(tstar)
+    return f
+
+# get displacements from applied tension
+def displacements(fw, tstar, fs=None, passR=False, debug=False):
     R = rig_mat(fw,2)
     Rt = R.T
     F = flex_mat(fw)
     Finv = np.linalg.pinv(F)
-    # Finv = scipy.linalg.pinv2(F)
-    
     H = Rt.dot(Finv).dot(R)
     Hinv = np.linalg.pinv(H)
-    # Hinv = scipy.linalg.pinv2(H)#, rcond=1e-2)
-    # TESTING BIGGER RCOND
-    # Hinv = np.linalg.pinv(H, rcond=1e-1)
+
     if debug:
-        # trying to figure out why the numbers are so big
-        # print("allclose?",np.allclose(H , np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
-        # print("diff?",(H - np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
-        # print("allclose?",np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv))))#, rtol=1e-3))
-        # print("MEAN:",np.mean(np.abs(Hinv)))
-        # print("LHS:",Rt.dot(tstar))
+        print("============ R ============\n",np.around(R,2))
+        print("============ F ============\n",np.around(F,2))
+        print("============ H ============\n",np.around(H,2))
+        print("============ Hinv ============\n",np.around(Hinv,2))
+
+    if not fs is None: 
+        u = Hinv.dot(fs)
+    else:
         u = Hinv.dot(Rt).dot(tstar)
-        # print("H:",list(H))
-        # plt.imshow(H)
-        # plt.show()
-        # print("RHS:", H.dot(u))
-        # print("disps:",u)
-        # print("Hu == Qt*:", (H.dot(u)- Rt.dot(tstar)))
-    return R.dot(Hinv.dot(Rt).dot(tstar))
+
+    if passR:
+        return u, R
+    else:
+        return u
+
+
+# get displacements from applied tension
+def extensions(fw, tstar, disps=None, debug=False): 
+    if not disps is None:
+        R = rig_mat(fw, 2)
+        exts = R.dot(disps)
+    else:
+        u, R = displacements(fw, tstar, passR=True, debug=debug)
+        exts = R.dot(u)
+
+    return exts
+
+# get strains from applied tension
+def strains(fw, tstar, exts=None, debug=False):
+    if exts is None:
+        exts = extensions(fw, tstar, debug=debug)
+    Nb = len(exts)
+    strains = np.zeros(Nb)
+    edge_list = list(fw.edges)
+    for i in range(Nb):
+        strains[i] = exts[i] / fw.edges[edge_list[i]]["length"]
+    return strains
+
+# gets the SSS and SCS subbases, and returns them in that order
+# recall SSS is states of self-stress, i.e. tensions that do not result in net forces on the nodes
+# also thought of as incompatible stresses, extensions that don't lead to valid node displacements
+# SCS is states of compatible stress, which DO correspond to net forces on the nodes
+# NOTE: I'm assuming we calculate this based on the scaled Q matrix
+def subbases(fw):
+    Q_bar = Q_bar_mat(fw)
+    U, sigma, Vt = np.linalg.svd(Q_bar)
+    mask = (np.isclose(sigma, 0))
+    U_red = U[:,:len(mask)]
+    SSS = U_red[:,mask].T
+    SCS = U_red[:,~mask].T
+    return SSS, SCS
+
+# An attempt at calculating the discrete green's
+def G_f(fw, SCS=None):
+    if SCS is None:
+        _, SCS = subbases(fw)
+
+    k = fw.graph["k"]
+    green = k*np.sum(np.array([np.outer(c, c) for c in SCS]),axis=0)
+    return green
+
+# function to stop me doing this all the time
+def get_edge_dict(fw):
+    es = fw.edges
+    return edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+
+def Ci(fw, edge, G=None):
+    if G is None:
+        G = G_f(fw)
+    k = fw.graph["k"]
+
+    edge_dict = get_edge_dict(fw)
+    index = edge_dict[edge]
+    edge_vec = np.zeros(len(G))
+    edge_vec[index] = 1
+    C = k * G.dot(edge_vec)
+    
+
+
+
+# NOTE: OLD VERSION
+# # get extensions from applied tension to framework
+# def extensions(fw, tstar, debug=False):
+#     R = rig_mat(fw,2)
+#     Rt = R.T
+#     F = flex_mat(fw)
+#     Finv = np.linalg.pinv(F)
+#     # Finv = scipy.linalg.pinv2(F)
+    
+#     H = Rt.dot(Finv).dot(R)
+#     Hinv = np.linalg.pinv(H)
+#     # Hinv = scipy.linalg.pinv2(H)#, rcond=1e-2)
+#     # TESTING BIGGER RCOND
+#     # Hinv = np.linalg.pinv(H, rcond=1e-1)
+#     if debug:
+#         # trying to figure out why the numbers are so big
+#         # print("allclose?",np.allclose(H , np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
+#         # print("diff?",(H - np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
+#         # print("allclose?",np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv))))#, rtol=1e-3))
+#         # print("MEAN:",np.mean(np.abs(Hinv)))
+#         # print("LHS:",Rt.dot(tstar))
+#         u = Hinv.dot(Rt).dot(tstar)
+#         # print("H:",list(H))
+#         # plt.imshow(H)
+#         # plt.show()
+#         # print("RHS:", H.dot(u))
+#         # print("disps:",u)
+#         # print("Hu == Qt*:", (H.dot(u)- Rt.dot(tstar)))
+#     return R.dot(Hinv.dot(Rt).dot(tstar))
 
 # test function to see if I can work out the extensions from removing each edge
 def all_extensions(fw, tstar):
@@ -441,7 +564,6 @@ def draw_strains(fw, strains, source=None, target=None, ghost=False, filename=No
         nx.draw_networkx_nodes(fw, pos, nodelist=source, node_color="g")
     if target:
         nx.draw_networkx_nodes(fw, pos, nodelist=target, node_color="r")
-
        
     # bbox = dict(boxstyle="round", alpha=0.0)
     nx.draw_networkx_edge_labels(fw, pos, e_labels, font_size=6)#, bbox=bbox)
@@ -470,10 +592,13 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
     # print("rank of R:",rank, "2n - 3:", 2*len(fw.nodes) - 3, "number of edges:",len(fw.edges))
     return true_cost
 
-
 # Run the tuning algorithm on a network for a given source, target, ratio
 def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False):
     fw = fw_orig.copy()
+    if source not in fw.edges or target not in fw.edges:
+        fw.add_edges_from([source, target])
+        fw = add_lengths_and_stiffs(fw)
+
     edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
 
     # modifying the framework to change two bonds to ghost bonds (source and target)

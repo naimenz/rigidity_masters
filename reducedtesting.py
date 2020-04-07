@@ -34,6 +34,7 @@ tensions[edge_dict[source]] = 1
 print("after tuning:\n===============")
 exts = extensions(fw, tensions, True)
 strains = exts_to_strains(fw, exts)
+print("strains on source, target resp.",strains[edge_dict[source]], strains[edge_dict[target]])
 draw_strains(fw, strains, source, target, ghost=True)
 print("after removing random bonds:\n============")
 # i'm now going to try removing like 6 random bonds and see what that does to the tension
@@ -41,10 +42,10 @@ i = 0
 while i < 2:
     index = np.random.choice(len(fwc.edges))
     edge = list(fwc.edges)[index]
-    fwc.edges[source]["lam"] = 0
-    fwc.edges[target]["lam"] = 0
-    if fwc.edges[edge]["lam"] != 0:
-        fwc.edges[edge]["lam"] = 0
+    fwc.edges[source]["lam"] = 1e-8
+    fwc.edges[target]["lam"] = 1e-8
+    if fwc.edges[edge]["lam"] != 1e-8:
+        fwc.edges[edge]["lam"] = 1e-8
         i += 1
 
 print(len(fw.edges), len(fwc.edges))
