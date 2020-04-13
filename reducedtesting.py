@@ -23,36 +23,78 @@ edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
 
 # COPYING BEFORE TUNING
 fwc = fw.copy()
+R = rig_mat(fw)
+R_bar = Q_bar_mat(fw).T
+print("Singular values of R:\n",np.linalg.svd(R, compute_uv=False))
+print("Singular values of R_bar:\n",np.linalg.svd(R_bar, compute_uv=False))
 
-fw = tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, cost_thresh=0.002)
+fw = tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, cost_thresh=0.002, verbose=True)
 
 # print(np.linalg.svd(rig_mat(fw)))
 tensions = [0]*len(fw.edges)
 tensions[edge_dict[source]] = 1
 # trying tension on neighbouring bonds
 # tensions[edge_dict[(195,199)]] = 1
-print("after tuning:\n===============")
-exts = extensions(fw, tensions, True)
-strains = exts_to_strains(fw, exts)
-print("strains on source, target resp.",strains[edge_dict[source]], strains[edge_dict[target]])
-draw_strains(fw, strains, source, target, ghost=True)
-print("after removing random bonds:\n============")
+print("AFTER TUNING:\n===============")
+# exts = extensions(fw, tensions)
+# strains = exts_to_strains(fw, exts)
+fw.edges[(18,22)]["lam"] = 0
+strs = strains(fw,tensions)
+print("strains on source, target resp.",strs[edge_dict[source]], strs[edge_dict[target]])
+draw_strains(fw, strs, source, target, ghost=True)
+
+R = rig_mat(fw)
+R_bar = Q_bar_mat(fw).T
+
+print("Singular values of R:\n",np.linalg.svd(R, compute_uv=False))
+print("Singular values of R_bar:\n",np.linalg.svd(R_bar, compute_uv=False))
+
+ratios = animate(fw, source, target, "images/anim10/", nstars, s_max=1, tensions=1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# print("after removing random bonds:\n============")
 # i'm now going to try removing like 6 random bonds and see what that does to the tension
 i = 0
-while i < 2:
-    index = np.random.choice(len(fwc.edges))
-    edge = list(fwc.edges)[index]
-    fwc.edges[source]["lam"] = 1e-8
-    fwc.edges[target]["lam"] = 1e-8
-    if fwc.edges[edge]["lam"] != 1e-8:
-        fwc.edges[edge]["lam"] = 1e-8
-        i += 1
+# while i < 2:
+#     index = np.random.choice(len(fwc.edges))
+#     edge = list(fwc.edges)[index]
+#     fwc.edges[source]["lam"] = 1e-8
+#     fwc.edges[target]["lam"] = 1e-8
+#     if fwc.edges[edge]["lam"] != 1e-8:
+#         fwc.edges[edge]["lam"] = 1e-8
+#         i += 1
 
-print(len(fw.edges), len(fwc.edges))
-exts = extensions(fwc, tensions, True)
-strains = exts_to_strains(fwc, exts)
-print("strains on source, target resp.",strains[edge_dict[source]], strains[edge_dict[target]])
-draw_strains(fwc, strains, source, target, ghost=True)
+# print(len(fw.edges), len(fwc.edges))
+# strs = strains(fwc, tensions)
+# print("strains on source, target resp.",strs[edge_dict[source]], strs[edge_dict[target]])
+# draw_strains(fwc, strs, source, target, ghost=True)
 
 # ratios = animate(fw, source, target, "images/anim10/", nstars, s_max=1, tensions=1)
 # plt.plot(ratios)

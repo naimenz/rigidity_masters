@@ -63,6 +63,31 @@ def add_lengths_and_stiffs(fw, lam=1):
         rv.graph["k"] = 1/lam
     return rv
 
+# creates the rigidity matrix for a d-dimensional framework
+# takes in a framework (nx graph with positions) and returns a numpy array
+def rig_mat(fw, d=2):
+    edgeview = fw.edges
+    nodeview = fw.nodes
+    n = len(list(fw))
+    e = len(edgeview)
+    M = np.zeros((e, d*n))
+    # print("SORTED",edgeview)
+        
+    for row, edge in enumerate(edgeview):
+        i,j = edge
+        pos1 = nodeview[i]["position"]
+        pos2 = nodeview[j]["position"]
+
+        if d == 1:
+            M[row, d*i] = pos1 - pos2
+            M[row, d*j] = -pos1 + pos2
+        else:
+            for k in range(d):
+                M[row, d*i+k] = pos1[k] - pos2[k]
+                M[row, d*j+k] = -pos1[k] + pos2[k]
+
+    return M
+
 # generate the flexibility matrix (as defined in The Paper)
 # NOTE: we assume a constant material modulus (lam) of 1 (as I don't know anything about this)
 # because lam=1, and the diag is 1/ki = 1/(lam/length), we just get a diagonal matrix of lengths
@@ -89,6 +114,37 @@ def Q_bar_mat(fw):
     R = rig_mat(fw)
     Q_bar = R.T.dot(Fhalf_inv)
     return Q_bar
+
+def get_Hinv(fw):
+    R = rig_mat(fw,2)
+    Rt = R.T
+    F = flex_mat(fw)
+    print(F)
+    Finv = np.linalg.pinv(F)
+    H = Rt.dot(Finv).dot(R)
+    Hinv = np.linalg.pinv(H)
+    
+    return Hinv
+
+# function to update the inverse using Sherman-Morrison
+def update_Hinv(fw, edge, Hinv=None):
+    edge_dict = get_edge_dict(fw)
+    i= edge_dict[edge]
+    R = rig_mat(fw)
+
+    if Hinv is None:
+        Hinv = get_Hinv(fw)
+
+    qi = R[i,:].reshape(-1,1)
+    numerator = 0.5 * Hinv @ qi @ qi.T @ Hinv
+    denom = 1 + (qi.T @ Hinv @ qi)
+
+    Hinv_bar = Hinv + numerator/denom
+    return Hinv_bar
+    # print((Hinv @ qi @ qi.T @ Hinv).shape)
+    # Hinv_bar = Hinv - (Hinv @
+    
+
     
 
 # convert a delaunay object into a list of edges that can be used to create a framework
@@ -247,30 +303,6 @@ def draw_comps(fw, comps, filename=None, show=True, recent_edge=None):
     if show:
         plt.show()
 
-# creates the rigidity matrix for a d-dimensional framework
-# takes in a framework (nx graph with positions) and returns a numpy array
-def rig_mat(fw, d=2):
-    edgeview = fw.edges
-    nodeview = fw.nodes
-    n = len(list(fw))
-    e = len(edgeview)
-    M = np.zeros((e, d*n))
-    # print("SORTED",edgeview)
-        
-    for row, edge in enumerate(edgeview):
-        i,j = edge
-        pos1 = nodeview[i]["position"]
-        pos2 = nodeview[j]["position"]
-
-        if d == 1:
-            M[row, d*i] = pos1 - pos2
-            M[row, d*j] = -pos1 + pos2
-        else:
-            for k in range(d):
-                M[row, d*i+k] = pos1[k] - pos2[k]
-                M[row, d*j+k] = -pos1[k] + pos2[k]
-
-    return M
 
 # creates the rigidity matrix with its nullspace appended as rows beneath
 def create_augmented_rigidity_matrix(fw, d):
@@ -399,10 +431,9 @@ def displacements(fw, tstar, fs=None, passR=False, debug=False):
     else:
         return u
 
-
 # get displacements from applied tension
 def extensions(fw, tstar, disps=None, debug=False): 
-    if not disps is None:
+    if not (disps is None):
         R = rig_mat(fw, 2)
         exts = R.dot(disps)
     else:
@@ -416,11 +447,11 @@ def strains(fw, tstar, exts=None, debug=False):
     if exts is None:
         exts = extensions(fw, tstar, debug=debug)
     Nb = len(exts)
-    strains = np.zeros(Nb)
+    strs = np.zeros(Nb)
     edge_list = list(fw.edges)
     for i in range(Nb):
-        strains[i] = exts[i] / fw.edges[edge_list[i]]["length"]
-    return strains
+        strs[i] = exts[i] / fw.edges[edge_list[i]]["length"]
+    return strs
 
 # gets the SSS and SCS subbases, and returns them in that order
 # recall SSS is states of self-stress, i.e. tensions that do not result in net forces on the nodes
@@ -448,7 +479,7 @@ def G_f(fw, SCS=None):
 # function to stop me doing this all the time
 def get_edge_dict(fw):
     es = fw.edges
-    return edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
+    return {edge: i for i, edge in enumerate(fw.edges)}
 
 def Ci(fw, edge, G=None):
     if G is None:
@@ -466,7 +497,7 @@ def Ci(fw, edge, G=None):
 
 # NOTE: OLD VERSION
 # # get extensions from applied tension to framework
-# def extensions(fw, tstar, debug=False):
+# def old_extensions(fw, tstar, debug=False):
 #     R = rig_mat(fw,2)
 #     Rt = R.T
 #     F = flex_mat(fw)
@@ -577,7 +608,7 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
     fw = fw_orig.copy()
     rem_edges = [edge for edge in fw.edges if (fw.edges[edge]["lam"] == 0 and (edge != source and edge != target))]
     fw.remove_edges_from(rem_edges)
-    print("true len",len(fw.edges))
+    # print("true len",len(fw.edges))
     # new edge dict for smaller framework
     edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
     tensions = [0]*len(fw.edges)
@@ -593,7 +624,7 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
     return true_cost
 
 # Run the tuning algorithm on a network for a given source, target, ratio
-def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False):
+def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False, verbose=True):
     fw = fw_orig.copy()
     if source not in fw.edges or target not in fw.edges:
         fw.add_edges_from([source, target])
@@ -607,10 +638,12 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
 
     tensions = [0]*len(fw.edges)
     tensions[edge_dict[source]] = tension
-    strains = exts_to_strains(fw, extensions(fw, tensions, debug=True))
-    print("initial strain ratio:",strains[edge_dict[target]]/strains[edge_dict[source]])
+    strs = strains(fw, tensions)
+    # strains = exts_to_strains(fw, extensions(fw, tensions, debug=True))
+    if verbose:
+        print("initial strain ratio:",strs[edge_dict[target]]/strs[edge_dict[source]])
     if draw:
-        draw_strains(fw, strains, source, target, ghost=True)
+        draw_strains(fw, strs, source, target, ghost=True)
 
     # calculating ns test
     it = 0
@@ -619,20 +652,22 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         costs = []
         exts_list = all_extensions(fw, tensions)
         for i, exts in enumerate(exts_list):
-            strains = exts_to_strains(fw, exts)
-            ns = [strains[edge_dict[target]] / strains[edge_dict[source]]]
+            strs = exts_to_strains(fw, exts)
+            ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
             costs.append(cost_f(ns, nstars))
         min_cost = min(costs)
         index_to_remove = costs.index(min_cost)
         edge_to_remove = list(fw.edges)[index_to_remove]
         fw.edges[edge_to_remove]["lam"] = 0
         # test to see numerical error
-        print("fake len",len(fw.edges))
+        # if verbose:
+            # print("fake len",len(fw.edges))
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
-        print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
-        print("true cost:",true_cost)
-        print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
+        if verbose:
+            print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+            print("true cost:",true_cost)
+            print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
         it+=1
 
     return fw
@@ -675,10 +710,10 @@ def source_strain(u, *args):
     # getting the rigidity matrix (Q^T) to calculate extensions from displacement
     R = rig_mat(fw)
     exts = R.dot(u)
-    strains = exts_to_strains(fw, exts)
+    strs = exts_to_strains(fw, exts)
     index = edge_dict[edge]
     # returns 0 if constraint is met
-    return strains[index] - val
+    return strs[index] - val
 
 # create a copy of the framework with positions changed according to a given displacement
 def update_pos(fw, u):
