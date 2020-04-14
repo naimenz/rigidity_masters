@@ -101,51 +101,123 @@ def flex_mat(fw):
 # the square root of the flex matrix
 def Fhalf_mat(fw):
     F = flex_mat(fw)
+    # TESTING TO SEE IF NOT SCALED 0 STIFFNESS WILL FIX
+    # basically having a 0 in F means a row of Q is killed completely
+    # so instead i'm setting them to 1 to avoid any scaling
+    for i in range(len(F)):
+        if F[i,i] == 0:
+            F[i,i] = 1
     return np.sqrt(F)
 
 # in the scaled version, all edges have length 1, so it's just 1/lam
-def F_bar_mat(fw):
+def Fbar_mat(fw):
     es = fw.edges
-    entries = [1/es[edge]["lam"] if es[edge]["lam"]!= 0 else 0 for edge in es]
+    entries = [fw.graph["k"] if es[edge]["lam"]!= 0 else 0 for edge in es]
     return np.diag(entries)
 
-def Q_bar_mat(fw):
-    Fhalf_inv = np.linalg.pinv(Fhalf_mat(fw))
+def Qbar_mat(fw):
+    Fhalf_inv = np.linalg.pinv(Fhalf_mat(fw), hermitian=True)
     R = rig_mat(fw)
     Q_bar = R.T.dot(Fhalf_inv)
     return Q_bar
 
-def get_Hinv(fw):
+def H_mat(fw):
     R = rig_mat(fw,2)
     Rt = R.T
     F = flex_mat(fw)
-    print(F)
-    Finv = np.linalg.pinv(F)
+    Finv = np.linalg.pinv(F, hermitian=True)
     H = Rt.dot(Finv).dot(R)
+    return H
+
+# calculate the normal Hinv
+def Hinv_mat(fw):
+    H = H_mat(fw)
     Hinv = np.linalg.pinv(H)
-    
     return Hinv
 
-# function to update the inverse using Sherman-Morrison
-def update_Hinv(fw, edge, Hinv=None):
+# calculate H with identical bond stiffness (rescaled)
+def Hbar_mat(fw):
+    Qbar = Qbar_mat(fw)
+    Fbar = Fbar_mat(fw)
+    Fbar_inv = np.linalg.pinv(Fbar, hermitian=True)
+    Hbar = Qbar @ Fbar_inv @ Qbar.T
+    return Hbar
+
+# calculate Hinv with identical bond stiffness (rescaled)
+def Hbar_inv_mat(fw):
+    Hbar_inv = np.linalg.pinv(Hbar_mat(fw))
+    return Hbar_inv
+
+# perform sm_update (assuming updated matrix is invertible
+def sm_update(Ainv, u, v):
+    Ainvu = np.dot(Ainv, u)
+    vtAinv = np.dot(Ainv.T, v)
+    Auvtinv = Ainv - (1 / (1 + np.dot(Ainvu, v))) * np.outer(Ainvu, vtAinv)
+    return Auvtinv
+
+def check_sm_update(A, Ainv, u, v):
+    Auvt = A + np.outer(u,v)
+    Ainvu = np.dot(Ainv, u)
+    vtAinv = np.dot(Ainv.T, v)
+    Auvtinv = Ainv - (1 / (1 + np.dot(Ainvu, v))) * np.outer(Ainvu, vtAinv)
+    print("denom is:",(1 + np.dot(Ainvu, v)))
+    return Auvt, Auvtinv
+
+def x_dagger(x):
+    return x.T / (np.linalg.norm(x)**2)
+
+# update for pseudoinverse as defined in meyer for c, d in R(A), R(A*), beta = 0
+def meyer_update(Ainv, c, d):
+    # d star is just d transpose
+    dt = d.T
+    k = Ainv @ c
+    h = dt @ Ainv
+    # daggered k and h as required by the paper
+    kd = x_dagger(k)
+    hd = x_dagger(h)
+
+    return Ainv - (k @ kd @ Ainv) - (Ainv @ hd @ h) + ((kd @ Ainv @ hd) * k @ h)
+
+# update for pseudoinverse as defined in meyer for c, d in R(A), R(A*), beta = 0
+# return updated inverse AND updated matrix for checking
+def check_meyer_update(A, Ainv, c, d):
+    # d star is just d transpose
+    dt = d.T
+    Acdt = A + c @ dt
+    k = Ainv @ c
+    h = dt @ Ainv
+    # daggered k and h as required by the paper
+    kd = x_dagger(k)
+    hd = x_dagger(h)
+
+    return Acdt, Ainv - (k @ kd @ Ainv) - (Ainv @ hd @ h) + ((kd @ Ainv @ hd) * k @ h)
+
+def check_update_Hinv(fw, edge, H, Hinv):
     edge_dict = get_edge_dict(fw)
     i= edge_dict[edge]
-    R = rig_mat(fw)
+    Qbar = Qbar_mat(fw)
 
-    if Hinv is None:
-        Hinv = get_Hinv(fw)
+    k = fw.graph["k"]
+    qi = Qbar[:,i].reshape(-1,1)
+    # NOTE: inner product of these two is -k (I think)
+    u = -k*qi
+    v = qi
+    Hu, Hinv_u = check_meyer_update(H, Hinv, u, v)
+    return Hu, Hinv_u
 
-    qi = R[i,:].reshape(-1,1)
-    numerator = 0.5 * Hinv @ qi @ qi.T @ Hinv
-    denom = 1 + (qi.T @ Hinv @ qi)
+# function to update the inverse using Sherman-Morrison
+def update_Hinv(fw, edge, Hinv):
+    edge_dict = get_edge_dict(fw)
+    i= edge_dict[edge]
+    Qbar = Qbar_mat(fw)
 
-    Hinv_bar = Hinv + numerator/denom
-    return Hinv_bar
-    # print((Hinv @ qi @ qi.T @ Hinv).shape)
-    # Hinv_bar = Hinv - (Hinv @
-    
-
-    
+    k = fw.graph["k"]
+    qi = Qbar[:,i].reshape(-1,1)
+    # NOTE: inner product of these two is -k (I think)
+    u = -k*qi
+    v = qi
+    Hinv_u = meyer_update(Hinv, u, v)
+    return Hinv_u
 
 # convert a delaunay object into a list of edges that can be used to create a framework
 def delaunay_to_edges(d):
@@ -411,7 +483,7 @@ def displacements(fw, tstar, fs=None, passR=False, debug=False):
     R = rig_mat(fw,2)
     Rt = R.T
     F = flex_mat(fw)
-    Finv = np.linalg.pinv(F)
+    Finv = np.linalg.pinv(F, hermitian=True)
     H = Rt.dot(Finv).dot(R)
     Hinv = np.linalg.pinv(H)
 
@@ -459,7 +531,7 @@ def strains(fw, tstar, exts=None, debug=False):
 # SCS is states of compatible stress, which DO correspond to net forces on the nodes
 # NOTE: I'm assuming we calculate this based on the scaled Q matrix
 def subbases(fw):
-    Q_bar = Q_bar_mat(fw)
+    Q_bar = Qbar_mat(fw)
     U, sigma, Vt = np.linalg.svd(Q_bar)
     mask = (np.isclose(sigma, 0))
     U_red = U[:,:len(mask)]
@@ -526,27 +598,32 @@ def Ci(fw, edge, G=None):
 #     return R.dot(Hinv.dot(Rt).dot(tstar))
 
 # test function to see if I can work out the extensions from removing each edge
-def all_extensions(fw, tstar):
+def all_extensions(fw, tstar, Hinv=None):
     exts = []
-    R = rig_mat(fw,2)
-    Rt = R.T
     for edge in fw.edges:
-        fwc = fw.copy()  
-        fwc.edges[edge]["lam"] = 0
-        F = flex_mat(fwc)
-        Finv = np.linalg.pinv(F)
-        # Finv = scipy.linalg.pinv2(F)
-        H = Rt.dot(Finv).dot(R)
-        
-        Hinv = np.linalg.pinv(H)
-        # Hinv = scipy.linalg.pinv2(H)#, rcond=1e-2)
-        # TESTING BIGGER RCOND
-        # Hinv = np.linalg.pinv(H, rcond=1e-1)
-        # Hinv = np.linalg.pinv(H, rcond=1e-10)
-        # if not (np.allclose(H, np.dot(H, np.dot(Hinv, H))) and np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv)))):
-        #     print("allclose?",np.allclose(H, np.dot(H, np.dot(Hinv, H))))#, rtol=1e-3))
-        #     print("allclose?",np.allclose(Hinv, np.dot(Hinv, np.dot(H, Hinv))))#, rtol=1e-3))
-        exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
+        # for brute-force
+        if Hinv is None:
+            R = rig_mat(fw,2)
+            Rt = R.T
+            fwc = fw.copy()  
+            fwc.edges[edge]["lam"] = 0
+            F = flex_mat(fwc)
+            Finv = np.linalg.pinv(F, hermitian=True)
+            H = Rt.dot(Finv).dot(R)
+            Hinv = np.linalg.pinv(H)
+
+            exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
+        # with SM updating
+        else:
+            if fw.edges[edge]["lam"] != 0:
+                Hinv_bar = update_Hinv(fw, edge, Hinv)
+                Qbar = Qbar_mat(fw)
+
+                # scaling extensions back
+                Fhalf = Fhalf_mat(fw)
+
+                # calculating in scaled, then rescaling for calculating cost
+                exts.append(Fhalf @ (Qbar.T @ Hinv_bar @ Qbar @ np.array(tstar)))
     return exts
 
 # converts extensions to strains for a given framework
@@ -567,7 +644,6 @@ def cost_f(ns, nstars):
             cost += nj**2
         else:
             cost += (nj/njstar - 1)**2
-
     return cost
 
 # borrowing heavily from draw_tensions, trying to draw the strains on the bonds
@@ -613,8 +689,8 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
     edge_dict = {edge: i for i, edge in enumerate(fw.edges)}
     tensions = [0]*len(fw.edges)
     tensions[edge_dict[source]] = tension
-    strains = exts_to_strains(fw, extensions(fw, tensions))
-    ns = [strains[edge_dict[target]] / strains[edge_dict[source]]]
+    strs = exts_to_strains(fw, extensions(fw, tensions))
+    ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
     true_cost = cost_f(ns, nstars)
     # remove another two edges to check rank
     # fw.remove_edges_from([source,target])
@@ -662,6 +738,56 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         # test to see numerical error
         # if verbose:
             # print("fake len",len(fw.edges))
+        true_cost = calc_true_cost(fw, source, target, nstars, tension)
+
+        if verbose:
+            print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+            print("true cost:",true_cost)
+            print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
+        it+=1
+
+    return fw
+# Run the tuning algorithm on a network for a given source, target, ratio USING SHERMAN-MORRISON UPDATING
+def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=10, draw=False, verbose=True):
+    fw = fw_orig.copy()
+    if source not in fw.edges or target not in fw.edges:
+        fw.add_edges_from([source, target])
+        fw = add_lengths_and_stiffs(fw)
+
+    edge_dict = get_edge_dict(fw)
+
+    # modifying the framework to change two bonds to ghost bonds (source and target)
+    fw.edges[source]["lam"] = 0
+    fw.edges[target]["lam"] = 0
+
+    tensions = [0]*len(fw.edges)
+    tensions[edge_dict[source]] = tension
+    strs = strains(fw, tensions)
+    # strains = exts_to_strains(fw, extensions(fw, tensions, debug=True))
+    if verbose:
+        print("initial strain ratio:",strs[edge_dict[target]]/strs[edge_dict[source]])
+    if draw:
+        draw_strains(fw, strs, source, target, ghost=True)
+
+    # calculating ns test
+    it = 0
+    min_cost = np.inf
+    # starting H inverse
+    Hbar_inv = Hbar_inv_mat(fw)
+    while min_cost > cost_thresh and it < it_thresh:
+        costs = []
+        exts_list = all_extensions(fw, tensions, Hbar_inv)
+        for i, exts in enumerate(exts_list):
+            strs = exts_to_strains(fw, exts)
+            ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
+            costs.append(cost_f(ns, nstars))
+        min_cost = min(costs)
+        index_to_remove = costs.index(min_cost)
+        edge_to_remove = list(fw.edges)[index_to_remove]
+        # update Hinv with the edge chosen
+        Hbar_inv = update_Hinv(fw, edge_to_remove, Hbar_inv)
+        fw.edges[edge_to_remove]["lam"] = 0
+        # test to see numerical error
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
         if verbose:
