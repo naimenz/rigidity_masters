@@ -4,6 +4,7 @@ import networkx as nx
 import numpy as np
 import scipy
 import poisson_disc_sample as pd
+from nose.tools import ok_
 
 from scipy.spatial import Delaunay
 from scipy.optimize import minimize
@@ -148,26 +149,37 @@ def Hbar_inv_mat(fw):
     Hbar_inv = np.linalg.pinv(Hbar_mat(fw))
     return Hbar_inv
 
+# returns True if b is in the column space of a
+# works by checking if there is a linear comb of the cols of a that gives b
+def in_col_space(a,b):
+    return np.allclose(a@np.linalg.lstsq(a,b, rcond=None)[0], b)
+
 # perform sm_update (assuming updated matrix is invertible
 def sm_update(Ainv, u, v):
-    Ainvu = np.dot(Ainv, u)
-    vtAinv = np.dot(Ainv.T, v)
-    Auvtinv = Ainv - (1 / (1 + np.dot(Ainvu, v))) * np.outer(Ainvu, vtAinv)
+    Ainvu = Ainv @ u
+    vtAinv = v.T @ Ainv
+    Auvtinv = Ainv - (1 / (1 + v.T @ Ainvu)) * Ainvu @ vtAinv
     return Auvtinv
 
 def check_sm_update(A, Ainv, u, v):
-    Auvt = A + np.outer(u,v)
-    Ainvu = np.dot(Ainv, u)
-    vtAinv = np.dot(Ainv.T, v)
-    Auvtinv = Ainv - (1 / (1 + np.dot(Ainvu, v))) * np.outer(Ainvu, vtAinv)
-    print("denom is:",(1 + np.dot(Ainvu, v)))
+    Auvt = A + u @ v.T
+    Ainvu = Ainv @ u
+    vtAinv = v.T @ Ainv
+    Auvtinv = Ainv - (1 / (1 + v.T @ Ainvu)) * Ainvu @ vtAinv
+    # print("denom is:",(1 + v.T @ Ainvu))
     return Auvt, Auvtinv
 
 def x_dagger(x):
     return x.T / (np.linalg.norm(x)**2)
 
-# update for pseudoinverse as defined in meyer for c, d in R(A), R(A*), beta = 0
-def meyer_update(Ainv, c, d):
+# calculate the updated pseudoinverse using meyer's 6 theorems
+# NOTE assuming real throughout
+def meyer_update(A, Ainv, c, d):
+    # pseudoinverse of vectors
+    def x_dagger(x):
+        return x.T / (np.linalg.norm(x)**2)
+
+    M, N = A.shape
     # d star is just d transpose
     dt = d.T
     k = Ainv @ c
@@ -175,22 +187,108 @@ def meyer_update(Ainv, c, d):
     # daggered k and h as required by the paper
     kd = x_dagger(k)
     hd = x_dagger(h)
+    u = c - A @ k
+    # ok_(np.allclose(u, (np.eye(M) - A @ Ainv) @ c))
+    v = dt - h @ A
+    # ok_(np.allclose(v, dt @ (np.eye(N) - Ainv @ A)))
+    ud = x_dagger(u)
+    vd = x_dagger(v)
+    beta = 1 + dt @ Ainv @ c
 
-    return Ainv - (k @ kd @ Ainv) - (Ainv @ hd @ h) + ((kd @ Ainv @ hd) * k @ h)
+    # NOTE: experimenting with saying c, d always in col space
+    # because tbh, they might be theoretically but not numerically, i haven't really thought about it
+    c_in_A = True #np.isclose(np.linalg.norm(u), 0)
+    d_in_At = True # np.isclose(np.linalg.norm(v), 0)
+    # print("NORM u:",np.linalg.norm(u))
+    # print("NORM v:",np.linalg.norm(v))
+    # ok_(c_in_A == in_col_space(A, c), d_in_At == in_col_space(A.T, d))
 
-# update for pseudoinverse as defined in meyer for c, d in R(A), R(A*), beta = 0
-# return updated inverse AND updated matrix for checking
-def check_meyer_update(A, Ainv, c, d):
-    # d star is just d transpose
-    dt = d.T
-    Acdt = A + c @ dt
-    k = Ainv @ c
-    h = dt @ Ainv
-    # daggered k and h as required by the paper
-    kd = x_dagger(k)
-    hd = x_dagger(h)
+    def inverse1():
+        # print("inv1")
+        return Ainv - (k @ ud) - (vd @ h) + (beta * vd @ ud)
 
-    return Acdt, Ainv - (k @ kd @ Ainv) - (Ainv @ hd @ h) + ((kd @ Ainv @ hd) * k @ h)
+    def inverse2():
+        # print("inv2")
+        return Ainv - (k @ kd @ Ainv) - (vd @ h)
+
+    def inverse3():
+        # print("inv3")
+        p1 = - (np.linalg.norm(k)**2 / beta)*v.T - k
+        q1t = - (np.linalg.norm(v)**2 / beta)*k.T @ Ainv - h
+        sigma1 = np.linalg.norm(k)**2 * np.linalg.norm(v)**2 + beta**2
+        return Ainv + (1/beta)*v.T @ k.T @ Ainv - (beta/sigma1)* p1 @ q1t
+
+    def inverse4():
+        # print("inv4")
+        return Ainv - Ainv @ hd @ h - k @ ud
+
+    def inverse5():
+        # print("inv5")
+        p2 = - (np.linalg.norm(u)**2/beta)*Ainv @ h.T - k
+        q2t = - (np.linalg.norm(h)**2/beta)*u.T - h
+        sigma2 = np.linalg.norm(h)**2 * np.linalg.norm(u)**2 + beta**2
+        return Ainv + (1/beta) * Ainv @ h.T @ u.T - (beta/sigma2)*p2 @ q2t
+
+    def inverse6():
+        # print("inv6")
+        return Ainv - (k @ kd @ Ainv) - (Ainv @ hd @ h) + ((kd @ Ainv @ hd) * k @ h)
+
+    # c in R(A)
+    if c_in_A:
+        # d in R(A*)
+        if d_in_At:
+            # beta == 0
+            if np.isclose(beta, 0):
+                # c in R(A), d in R(A*), beta = 0
+                return inverse6()
+
+            # beta != 0 
+            else: 
+                # c in R(A), d in R(A*), beta != 0
+                inv3 = inverse3()
+                inv5 = inverse5()
+                # ok_("3 and 5 CLOSE?:",np.allclose(inv3, inv5))
+                return(inv5)
+
+        # d not in R(A*)
+        else: 
+            # beta == 0
+            if np.isclose(beta, 0):
+                # c in R(A), d not in R(A*), beta = 0
+                return inverse2()
+
+            # beta != 0 
+            else: 
+                # c in R(A), d not in R(A*), beta != 0
+                return inverse3()
+
+
+    # c not in R(A)
+    else:
+        # d in R(A*)
+        if d_in_At:
+            # beta == 0
+            if np.isclose(beta, 0):
+                # c not in R(A), d in R(A*), beta = 0
+                return inverse4()
+
+            # beta != 0 
+            else: 
+                # c not in R(A), d in R(A*), beta != 0
+                return inverse5()
+
+        # d not in R(A*)
+        else:       
+            # beta == 0
+            if np.isclose(beta, 0):
+                # c not in R(A), d not in R(A*), beta = 0
+                return inverse1()
+
+            # beta != 0 
+            else: 
+                # c not in R(A), d not in R(A*), beta != 0
+                return inverse1()
+    print("UHOH")
 
 def check_update_Hinv(fw, edge, H, Hinv):
     edge_dict = get_edge_dict(fw)
@@ -202,7 +300,10 @@ def check_update_Hinv(fw, edge, H, Hinv):
     # NOTE: inner product of these two is -k (I think)
     u = -k*qi
     v = qi
-    Hu, Hinv_u = check_meyer_update(H, Hinv, u, v)
+    # print("u in col space, v in row space:", in_col_space(H, u), in_col_space(H.T, v))
+    # print("rank H:", np.linalg.matrix_rank(H), H.shape)
+    # print("denom is:",(1 + v.T @ Hinv @ u))
+    Hu, Hinv_u = H + u @ v.T, meyer_update(H, Hinv, u, v)
     return Hu, Hinv_u
 
 # function to update the inverse using Sherman-Morrison
@@ -294,7 +395,6 @@ def heuristic1(fw, edge):
 # check that we aren't creating any degree two nodes
 def heuristic2(fw, edge, degree=2):
     return (fw.degree(edge[0]) > degree+1 and fw.degree(edge[1]) > degree+1)
-
 
 # creates a random framework and then removes edges until
 # there are just twice as many edges left 
@@ -598,32 +698,39 @@ def Ci(fw, edge, G=None):
 #     return R.dot(Hinv.dot(Rt).dot(tstar))
 
 # test function to see if I can work out the extensions from removing each edge
-def all_extensions(fw, tstar, Hinv=None):
+def all_extensions(fw, tstar, H=None, Hinv=None):
     exts = []
-    for edge in fw.edges:
-        # for brute-force
-        if Hinv is None:
-            R = rig_mat(fw,2)
-            Rt = R.T
-            fwc = fw.copy()  
-            fwc.edges[edge]["lam"] = 0
-            F = flex_mat(fwc)
-            Finv = np.linalg.pinv(F, hermitian=True)
-            H = Rt.dot(Finv).dot(R)
-            Hinv = np.linalg.pinv(H)
-
-            exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
-        # with SM updating
-        else:
+    # for brute-force
+    if Hinv is None:
+        R = rig_mat(fw,2)
+        Rt = R.T
+        for edge in fw.edges:
             if fw.edges[edge]["lam"] != 0:
-                Hinv_bar = update_Hinv(fw, edge, Hinv)
-                Qbar = Qbar_mat(fw)
+                fwc = fw.copy()  
+                F = flex_mat(fwc)
+                Finv = np.linalg.pinv(F, hermitian=True)
+                H = Rt.dot(Finv).dot(R)
+                Hinv = np.linalg.pinv(H)
 
-                # scaling extensions back
-                Fhalf = Fhalf_mat(fw)
+                exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
+            else:
+                exts.append(None)
+    # with SM updating
+    else:
+        Qbar = Qbar_mat(fw)
+        # scaling extensions back
+        Fhalf = Fhalf_mat(fw)
+        for edge in fw.edges:
+            if fw.edges[edge]["lam"] != 0:
+                H_new, Hinv_bar = check_update_Hinv(fw, edge,H, Hinv)
+                # if not (np.allclose(H_new, H_new @ Hinv_bar @ H_new)):
+                    # print("FAILED IN ALL EXTS")
 
                 # calculating in scaled, then rescaling for calculating cost
                 exts.append(Fhalf @ (Qbar.T @ Hinv_bar @ Qbar @ np.array(tstar)))
+            else:
+                # if we don't consider this edge, just say None
+                exts.append(None)
     return exts
 
 # converts extensions to strains for a given framework
@@ -692,11 +799,6 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
     strs = exts_to_strains(fw, extensions(fw, tensions))
     ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
     true_cost = cost_f(ns, nstars)
-    # remove another two edges to check rank
-    # fw.remove_edges_from([source,target])
-    # R = rig_mat(fw,2)
-    # rank = np.linalg.matrix_rank(R)
-    # print("rank of R:",rank, "2n - 3:", 2*len(fw.nodes) - 3, "number of edges:",len(fw.edges))
     return true_cost
 
 # Run the tuning algorithm on a network for a given source, target, ratio
@@ -738,7 +840,11 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         # test to see numerical error
         # if verbose:
             # print("fake len",len(fw.edges))
+        import time
+        tic = time.perf_counter()
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
+        toc = time.perf_counter()
+        print(f"True cost took {toc - tic:0.4f} seconds")
 
         if verbose:
             print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
@@ -748,7 +854,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
 
     return fw
 # Run the tuning algorithm on a network for a given source, target, ratio USING SHERMAN-MORRISON UPDATING
-def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=10, draw=False, verbose=True):
+def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=100, draw=False, verbose=True):
     fw = fw_orig.copy()
     if source not in fw.edges or target not in fw.edges:
         fw.add_edges_from([source, target])
@@ -773,22 +879,32 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
     it = 0
     min_cost = np.inf
     # starting H inverse
+    Hbar = Hbar_mat(fw)
     Hbar_inv = Hbar_inv_mat(fw)
     while min_cost > cost_thresh and it < it_thresh:
         costs = []
-        exts_list = all_extensions(fw, tensions, Hbar_inv)
+        exts_list = all_extensions(fw, tensions, Hbar, Hbar_inv)
         for i, exts in enumerate(exts_list):
-            strs = exts_to_strains(fw, exts)
-            ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
-            costs.append(cost_f(ns, nstars))
+            if exts is None:
+                costs.append(np.inf)
+            else:
+                strs = exts_to_strains(fw, exts)
+                ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
+                costs.append(cost_f(ns, nstars))
         min_cost = min(costs)
         index_to_remove = costs.index(min_cost)
         edge_to_remove = list(fw.edges)[index_to_remove]
         # update Hinv with the edge chosen
-        Hbar_inv = update_Hinv(fw, edge_to_remove, Hbar_inv)
+        Hbar, Hbar_inv = check_update_Hinv(fw, edge_to_remove,Hbar, Hbar_inv)
+        # ok_(np.allclose(Hbar, Hbar @ Hbar_inv @ Hbar))
+
         fw.edges[edge_to_remove]["lam"] = 0
         # test to see numerical error
+        import time
+        tic = time.perf_counter()
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
+        toc = time.perf_counter()
+        print(f"True cost took {toc - tic:0.4f} seconds")
 
         if verbose:
             print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
