@@ -585,7 +585,7 @@ def displacements(fw, tstar, fs=None, passR=False, debug=False):
     F = flex_mat(fw)
     Finv = np.linalg.pinv(F, hermitian=True)
     H = Rt.dot(Finv).dot(R)
-    Hinv = np.linalg.pinv(H)
+    Hinv = np.linalg.pinv(H, hermitian=True)
 
     if debug:
         print("============ R ============\n",np.around(R,2))
@@ -603,15 +603,21 @@ def displacements(fw, tstar, fs=None, passR=False, debug=False):
     else:
         return u
 
-# get displacements from applied tension
+# get extensions from applied tension
 def extensions(fw, tstar, disps=None, debug=False): 
     if not (disps is None):
         R = rig_mat(fw, 2)
         exts = R.dot(disps)
+
+
     else:
         u, R = displacements(fw, tstar, passR=True, debug=debug)
         exts = R.dot(u)
 
+    # TEST NOTE: trying to rescale extensions
+    edge_list = list(fw.edges)
+    for i in range(len(edge_list)):
+        exts[i] = exts[i] / fw.edges[edge_list[i]]["length"]
     return exts
 
 # get strains from applied tension
@@ -713,7 +719,12 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
                 H = Rt.dot(Finv).dot(R)
                 Hinv = np.linalg.pinv(H, hermitian=True)
 
-                exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
+                ext = R.dot(Hinv.dot(Rt).dot(tstar))
+                # TEST NOTE: trying to rescale extensions
+                edge_list = list(fw.edges)
+                for i in range(len(edge_list)):
+                    ext[i] = ext[i] / fw.edges[edge_list[i]]["length"]
+                exts.append(ext)
             else:
                 exts.append(None)
     # with SM updating
@@ -728,7 +739,12 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
                     # print("FAILED IN ALL EXTS")
 
                 # calculating in scaled, then rescaling for calculating cost
-                exts.append(Fhalf @ (Qbar.T @ Hinv_bar @ Qbar @ np.array(tstar)))
+                ext = Fhalf @ (Qbar.T @ Hinv_bar @ Qbar @ np.array(tstar))
+                # TEST NOTE: trying to rescale extensions
+                edge_list = list(fw.edges)
+                for i in range(len(edge_list)):
+                    ext[i] = ext[i] / fw.edges[edge_list[i]]["length"]
+                exts.append(ext)
             else:
                 # if we don't consider this edge, just say None
                 exts.append(None)
@@ -842,12 +858,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         edge_to_remove = list(fw.edges)[index_to_remove]
         fw.edges[edge_to_remove]["lam"] = 0
         # test to see numerical error
-        # if verbose:
-            # print("fake len",len(fw.edges))
-        import time
-        tic = time.perf_counter()
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
-        toc = time.perf_counter()
         print(f"True cost took {toc - tic:0.4f} seconds")
 
         if verbose:
@@ -956,10 +967,12 @@ def source_strain(u, *args):
     # getting the rigidity matrix (Q^T) to calculate extensions from displacement
     R = rig_mat(fw)
     exts = R.dot(u)
-    strs = exts_to_strains(fw, exts)
     index = edge_dict[edge]
+    # TEST NOTE: Rescaled extensions here
+    return exts[index]/(fw.edges[edge]["length"]**2) - val
+    strs = exts_to_strains(fw, exts)
     # returns 0 if constraint is met
-    return strs[index] - val
+    return strs[index]/ fw.edges[edge]["length"] - val
 
 # create a copy of the framework with positions changed according to a given displacement
 def update_pos(fw, u):
