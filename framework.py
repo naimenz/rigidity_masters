@@ -707,10 +707,11 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
         for edge in fw.edges:
             if fw.edges[edge]["lam"] != 0:
                 fwc = fw.copy()  
+                fwc.edges[edge]["lam"] = 0
                 F = flex_mat(fwc)
                 Finv = np.linalg.pinv(F, hermitian=True)
                 H = Rt.dot(Finv).dot(R)
-                Hinv = np.linalg.pinv(H)
+                Hinv = np.linalg.pinv(H, hermitian=True)
 
                 exts.append(R.dot(Hinv.dot(Rt).dot(tstar)))
             else:
@@ -830,9 +831,12 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         costs = []
         exts_list = all_extensions(fw, tensions)
         for i, exts in enumerate(exts_list):
-            strs = exts_to_strains(fw, exts)
-            ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
-            costs.append(cost_f(ns, nstars))
+            if exts is None:
+                costs.append(np.inf)
+            else:
+                strs = exts_to_strains(fw, exts)
+                ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
+                costs.append(cost_f(ns, nstars))
         min_cost = min(costs)
         index_to_remove = costs.index(min_cost)
         edge_to_remove = list(fw.edges)[index_to_remove]
@@ -980,7 +984,7 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
     for i in range(n):
         strain_val = 0.5 *s_max * (i/(n-1))
         print("=========== ITERATION",str(i),"============")
-        print("target strain val:",strain_val)
+        print("source strain val constraint:",strain_val)
         constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
         mind = minimize(energy, u0, args=(fw), constraints=constraints)
         print("minimized energy, success, and # iterations:",mind.fun, mind.success,mind.nit)
@@ -988,6 +992,7 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
         u0 = mind.x
         real_exts = rig_mat(fw).dot(u0)
         real_strains = exts_to_strains(fw, real_exts)
+        print("target, source strain:",real_strains[edge_dict[target]], real_strains[edge_dict[source]])
         real_ratio = real_strains[edge_dict[target]]/real_strains[edge_dict[source]]
         if real_ratio != np.nan:
             real_ratios_list.append(real_ratio)

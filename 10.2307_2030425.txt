@@ -1,0 +1,14 @@
+@article{10.2307/2030425,
+ ISSN = {00361445},
+ URL = {http://www.jstor.org/stable/2030425},
+ abstract = {The Sherman--Morrison--Woodbury formulas relate the inverse of a matrix after a small-rank perturbation to the inverse of the original matrix. The history of these formulas is presented and various applications to statistics, networks, structural analysis, asymptotic analysis, optimization, and partial differential equations are discussed. The Sherman--Morrison--Woodbury formulas express the inverse of a matrix after a small rank perturbation in terms of the inverse of the original matrix. This paper surveys the history of these formulas and we examine some applications where these formulas are helpful.},
+ author = {William W. Hager},
+ journal = {SIAM Review},
+ number = {2},
+ pages = {221--239},
+ publisher = {Society for Industrial and Applied Mathematics},
+ title = {Updating the Inverse of a Matrix},
+ volume = {31},
+ year = {1989}
+}
+

@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 # initialise the seed for reproducibility 
 np.random.seed(103)
 
-fw = make_nice_fw(300, 1)
+fw = make_nice_fw(200, 1)
 flag, comps = pebble_game(fw)
 draw_comps(fw, comps)
 

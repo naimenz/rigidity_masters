@@ -1,0 +1,14 @@
+@article{10.2307/2099767,
+ ISSN = {00361399},
+ URL = {http://www.jstor.org/stable/2099767},
+ abstract = {For an m × n complex matrix A and two columns, c and d, representations for the Moore-Penrose inverse of the matrix A + cd* are given for all possible cases. Moreover, each representation involves only A,A†,c,d, and their conjugate transposes.},
+ author = {Carl D. Meyer},
+ journal = {SIAM Journal on Applied Mathematics},
+ number = {3},
+ pages = {315--323},
+ publisher = {Society for Industrial and Applied Mathematics},
+ title = {Generalized Inversion of Modified Matrices},
+ volume = {24},
+ year = {1973}
+}
+
