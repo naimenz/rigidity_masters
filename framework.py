@@ -994,6 +994,8 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
     tensions = [0]*len(fw.edges)
     tensions[edge_dict[source]] = 1
     u0 = np.zeros(len(fw.nodes) * 2)
+    # writing out the graph
+    # nx.write_gexf(fw, fileroot+"graph.gexf")
     for i in range(n):
         strain_val = 0.5 *s_max * (i/(n-1))
         print("=========== ITERATION",str(i),"============")
@@ -1005,14 +1007,23 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
         u0 = mind.x
         real_exts = rig_mat(fw).dot(u0)
         real_strains = exts_to_strains(fw, real_exts)
-        print("target, source strain:",real_strains[edge_dict[target]], real_strains[edge_dict[source]])
-        real_ratio = real_strains[edge_dict[target]]/real_strains[edge_dict[source]]
+	# adjusting for proper strain calculation
+        real_target_strain = real_strains[edge_dict[target]] / fw.edges[target]["length"]
+        real_source_strain = real_strains[edge_dict[source]] / fw.edges[source]["length"]
+        print("target, source strain:",real_target_strain, real_source_strain)
+        real_ratio = real_target_strain/real_source_strain
         if real_ratio != np.nan:
             real_ratios_list.append(real_ratio)
         print("full nonlinear strain ratio:", real_ratio)
         draw_framework(update_pos(fw, mind.x), filename=fileroot+"anim_"+str(i)+".png",ghost=True, source=source, target=target)
         plt.close()
         print("drawn",i+1,"images of",n)
+	# logging the positions
+        with open(fileroot+'log.log', 'a') as f:
+              np.savetxt(f,u0)
+              f.write(',')
+	    
+	
 
     fig = plt.figure()
     plt.plot(real_ratios_list)
