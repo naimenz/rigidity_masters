@@ -79,13 +79,15 @@ def rig_mat(fw, d=2):
         pos1 = nodeview[i]["position"]
         pos2 = nodeview[j]["position"]
 
+        
+    # TEST NOTE: rescaling rigidity matrix throughout
         if d == 1:
-            M[row, d*i] = pos1 - pos2
-            M[row, d*j] = -pos1 + pos2
+            M[row, d*i] = (pos1 - pos2)  / edgeview[edge]["length"]
+            M[row, d*j] = (-pos1 + pos2)  / edgeview[edge]["length"]
         else:
             for k in range(d):
-                M[row, d*i+k] = pos1[k] - pos2[k]
-                M[row, d*j+k] = -pos1[k] + pos2[k]
+                M[row, d*i+k] = (pos1[k] - pos2[k]) / edgeview[edge]["length"]
+                M[row, d*j+k] = (-pos1[k] + pos2[k]) / edgeview[edge]["length"]
 
     return M
 
@@ -615,9 +617,9 @@ def extensions(fw, tstar, disps=None, debug=False):
         exts = R.dot(u)
 
     # TEST NOTE: trying to rescale extensions
-    edge_list = list(fw.edges)
-    for i in range(len(edge_list)):
-        exts[i] = exts[i] / fw.edges[edge_list[i]]["length"]
+#     edge_list = list(fw.edges)
+#     for i in range(len(edge_list)):
+#         exts[i] = exts[i] / fw.edges[edge_list[i]]["length"]
     return exts
 
 # get strains from applied tension
@@ -721,9 +723,9 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
 
                 ext = R.dot(Hinv.dot(Rt).dot(tstar))
                 # TEST NOTE: trying to rescale extensions
-                edge_list = list(fw.edges)
-                for i in range(len(edge_list)):
-                    ext[i] = ext[i] / fw.edges[edge_list[i]]["length"]
+#                 edge_list = list(fw.edges)
+#                 for i in range(len(edge_list)):
+#                     ext[i] = ext[i] / fw.edges[edge_list[i]]["length"]
                 exts.append(ext)
             else:
                 exts.append(None)
@@ -741,9 +743,9 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
                 # calculating in scaled, then rescaling for calculating cost
                 ext = Fhalf @ (Qbar.T @ Hinv_bar @ Qbar @ np.array(tstar))
                 # TEST NOTE: trying to rescale extensions
-                edge_list = list(fw.edges)
-                for i in range(len(edge_list)):
-                    ext[i] = ext[i] / fw.edges[edge_list[i]]["length"]
+#                 edge_list = list(fw.edges)
+#                 for i in range(len(edge_list)):
+#                     ext[i] = ext[i] / fw.edges[edge_list[i]]["length"]
                 exts.append(ext)
             else:
                 # if we don't consider this edge, just say None
@@ -969,10 +971,10 @@ def source_strain(u, *args):
     exts = R.dot(u)
     index = edge_dict[edge]
     # TEST NOTE: Rescaled extensions here
-    return exts[index]/(fw.edges[edge]["length"]**2) - val
+#     return exts[index]/(fw.edges[edge]["length"]**2) - val
     strs = exts_to_strains(fw, exts)
     # returns 0 if constraint is met
-    return strs[index]/ fw.edges[edge]["length"] - val
+    return strs[index] - val
 
 # create a copy of the framework with positions changed according to a given displacement
 def update_pos(fw, u):
@@ -1007,9 +1009,9 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
         u0 = mind.x
         real_exts = rig_mat(fw).dot(u0)
         real_strains = exts_to_strains(fw, real_exts)
-	# adjusting for proper strain calculation
-        real_target_strain = real_strains[edge_dict[target]] / fw.edges[target]["length"]
-        real_source_strain = real_strains[edge_dict[source]] / fw.edges[source]["length"]
+    # adjusting for proper strain calculation
+        real_target_strain = real_strains[edge_dict[target]] #/ fw.edges[target]["length"]
+        real_source_strain = real_strains[edge_dict[source]] #/ fw.edges[source]["length"]
         print("target, source strain:",real_target_strain, real_source_strain)
         real_ratio = real_target_strain/real_source_strain
         if real_ratio != np.nan:
@@ -1018,12 +1020,12 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
         draw_framework(update_pos(fw, mind.x), filename=fileroot+"anim_"+str(i)+".png",ghost=True, source=source, target=target)
         plt.close()
         print("drawn",i+1,"images of",n)
-	# logging the positions
+    # logging the positions
         with open(fileroot+'log.log', 'a') as f:
               np.savetxt(f,u0)
               f.write(',')
-	    
-	
+        
+    
 
     fig = plt.figure()
     plt.plot(real_ratios_list)

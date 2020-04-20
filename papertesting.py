@@ -36,13 +36,13 @@ fw = add_lengths_and_stiffs(fw)
 
 import time
 tic = time.perf_counter()
-fw_sm = SM_tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, verbose=True)
+fw = SM_tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, verbose=True)
 toc = time.perf_counter()
 print(f"SM took {toc - tic:0.4f} seconds")
 
-red_edges = [(1,5),(9,18),(37,46),(54,69),(77,84),(174,173), (0,1), (187,188)]
-for edge in red_edges:
-    fw.edges[edge]["lam"] = 0 
-draw_framework(fw, ghost=True)
+# red_edges = [(1,5),(9,18),(37,46),(54,69),(77,84),(174,173), (0,1), (187,188)]
+# for edge in red_edges:
+#     fw.edges[edge]["lam"] = 0 
+# draw_framework(fw, ghost=True)
 
-ratios = animate(fw, source, target, "images/paper/", nstars, s_max=1, tensions=1)
+ratios = animate(fw, source, target, "images/scale_R/", nstars, s_max=1, tensions=1)
