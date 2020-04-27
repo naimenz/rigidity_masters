@@ -802,9 +802,8 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
                 exts.append(None)
     # with SM updating
     else:
-        Qbar = Qbar_mat(fw)
+        Q = rig_mat(fw).T
         # scaling extensions back
-        Fhalf = Fhalf_mat(fw)
         for edge in fw.edges:
             if fw.edges[edge]["lam"] != 0:
                 H_new, Hinv_bar = check_update_Hinv(fw, edge,H, Hinv)
@@ -812,7 +811,7 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
                     # print("FAILED IN ALL EXTS")
 
                 # calculating in scaled, then rescaling for calculating cost
-                ext = Fhalf @ (Qbar.T @ Hinv_bar @ Qbar @ np.array(tstar))
+                ext = Q.T @ Hinv_bar @ Q@ np.array(tstar)
                 # TEST NOTE: trying to rescale extensions
 #                 edge_list = list(fw.edges)
 #                 for i in range(len(edge_list)):
@@ -1048,15 +1047,15 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
     it = 0
     min_cost = np.inf
     # starting H inverse
-    Hbar = Hbar_mat(fw)
-    Hbar_inv = Hbar_inv_mat(fw)
+    H = H_mat(fw)
+    H_inv = Hinv_mat(fw)
     while min_cost > cost_thresh and it < it_thresh:
         # starting H inverse
         # NOTE: recalculating before each edge removal
-        Hbar = Hbar_mat(fw)
-        Hbar_inv = Hbar_inv_mat(fw)
+        H = H_mat(fw)
+        H_inv = Hinv_mat(fw)
         costs = []
-        exts_list = all_extensions(fw, tensions, Hbar, Hbar_inv)
+        exts_list = all_extensions(fw, tensions, H, H_inv)
         for i, exts in enumerate(exts_list):
             if exts is None:
                 costs.append(np.inf)
@@ -1068,7 +1067,7 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
         index_to_remove = costs.index(min_cost)
         edge_to_remove = list(fw.edges)[index_to_remove]
         # update Hinv with the edge chosen
-        Hbar, Hbar_inv = check_update_Hinv(fw, edge_to_remove,Hbar, Hbar_inv)
+        H, H_inv = check_update_Hinv(fw, edge_to_remove,H, H_inv)
         # ok_(np.allclose(Hbar, Hbar @ Hbar_inv @ Hbar))
 
         fw.edges[edge_to_remove]["lam"] = 0

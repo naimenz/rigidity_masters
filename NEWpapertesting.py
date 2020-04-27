@@ -31,13 +31,18 @@ edges = np.loadtxt("edges.csv",dtype=np.int, delimiter=',')
 fw = create_framework(nodes, edges, positions)
 draw_framework(fw, ghost=True)
 
-
 # returns a tuned network
 source = (72, 96)
 target = (152, 165)
 nstars = [1.0]
 fw.add_edges_from([source, target])
 fw = add_lengths_and_stiffs(fw)
+
+import time
+tic = time.perf_counter()
+fw = tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, verbose=True)
+toc = time.perf_counter()
+print(f"BF took {toc - tic:0.4f} seconds")
 
 import time
 tic = time.perf_counter()
