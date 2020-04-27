@@ -36,7 +36,7 @@ fw = add_lengths_and_stiffs(fw)
 
 import time
 tic = time.perf_counter()
-fw = SM_tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, verbose=True)
+fw = GF_tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, verbose=True)
 toc = time.perf_counter()
 print(f"SM took {toc - tic:0.4f} seconds")
 

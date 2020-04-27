@@ -44,10 +44,10 @@ def create_framework(nodes, edges, positions):
     return fw
 
 # get the lengths of each edge in the framework 
-# also add bulk modulus (lambda) of 1
+# also add bulk modulus (lambda) of 1 (NOTE now 2 to avoid numerical issues?)
 # NOTE: I have no clue which modulus we're talking about,
 # but I now assume it's the Young's modulus
-def add_lengths_and_stiffs(fw, lam=1):
+def add_lengths_and_stiffs(fw, lam=5):
     # create a copy to add the lengths to and to return
     rv = fw.copy()
     for edge in rv.edges:
@@ -199,8 +199,12 @@ def meyer_update(A, Ainv, c, d):
 
     # NOTE: experimenting with saying c, d always in col space
     # because tbh, they might be theoretically but not numerically, i haven't really thought about it
-    c_in_A = True #np.isclose(np.linalg.norm(u), 0)
-    d_in_At = True # np.isclose(np.linalg.norm(v), 0)
+    # c_in_A = np.isclose(np.linalg.norm(u), 0)
+    # d_in_At =  np.isclose(np.linalg.norm(v), 0)
+    c_in_A = True 
+    d_in_At = True 
+    # c_in_A = np.isclose(np.linalg.norm(u), 0)
+    # d_in_At =  np.isclose(np.linalg.norm(v), 0)
     # print("NORM u:",np.linalg.norm(u))
     # print("NORM v:",np.linalg.norm(v))
     # ok_(c_in_A == in_col_space(A, c), d_in_At == in_col_space(A.T, d))
@@ -249,7 +253,7 @@ def meyer_update(A, Ainv, c, d):
                 # c in R(A), d in R(A*), beta != 0
                 inv3 = inverse3()
                 inv5 = inverse5()
-                # ok_("3 and 5 CLOSE?:",np.allclose(inv3, inv5))
+                ok_("3 and 5 CLOSE?:",np.allclose(inv3, inv5))
                 return(inv5)
 
         # d not in R(A*)
@@ -289,6 +293,7 @@ def meyer_update(A, Ainv, c, d):
             # beta != 0 
             else: 
                 # c not in R(A), d not in R(A*), beta != 0
+                print("1")
                 return inverse1()
     print("UHOH")
 
@@ -415,9 +420,25 @@ def create_reduced_fw(n, r, seed=None):
 def draw_framework(fw, filename=None, ghost=False, source=None, target=None, equal=True):
     nodeview = fw.nodes
     fig, ax = plt.subplots(figsize=(20,10))
+
     if equal:
         ax.set_aspect('equal')
     pos = {node: nodeview[node]["position"] for node in nodeview}
+    # SETTING AXIS LIMITS
+    minx = np.inf
+    miny = np.inf
+    maxx = -np.inf
+    maxy = -np.inf
+    for val in pos.values():
+        minx = min(minx, val[0])
+        miny = min(miny, val[1])
+        maxx = max(maxx, val[0])
+        maxy = max(maxy, val[1])
+    xbuf = (maxx - minx) / 10
+    ybuf = (maxy - miny) / 10
+    plt.xlim(minx - xbuf, maxx + xbuf)
+    plt.ylim(miny - ybuf, maxy + ybuf)
+    # END SETTING AXIS LIMITS
     nx.draw_networkx_nodes(fw, pos, with_labels=True)
     nx.draw_networkx_labels(fw,pos)
     if source:
@@ -611,7 +632,6 @@ def extensions(fw, tstar, disps=None, debug=False):
         R = rig_mat(fw, 2)
         exts = R.dot(disps)
 
-
     else:
         u, R = displacements(fw, tstar, passR=True, debug=debug)
         exts = R.dot(u)
@@ -638,20 +658,23 @@ def strains(fw, tstar, exts=None, debug=False):
 # also thought of as incompatible stresses, extensions that don't lead to valid node displacements
 # SCS is states of compatible stress, which DO correspond to net forces on the nodes
 # NOTE: I'm assuming we calculate this based on the scaled Q matrix
+
+# NOTE: each ROW of the SSS and SCS arrays corresponds to a vector
 def subbases(fw):
     Q_bar = Qbar_mat(fw)
     U, sigma, Vt = np.linalg.svd(Q_bar)
     mask = (np.isclose(sigma, 0))
-    U_red = U[:,:len(mask)]
-    SSS = U_red[:,mask].T
-    SCS = U_red[:,~mask].T
+    # extra vectors have singular value 0?
+    Vt_red = Vt[:len(mask)]
+    Vt_0 = Vt[len(mask):]
+    SSS = np.concatenate((Vt_red[mask], Vt_0))
+    SCS = Vt_red[~mask]
     return SSS, SCS
 
 # An attempt at calculating the discrete green's
 def G_f(fw, SCS=None):
     if SCS is None:
         _, SCS = subbases(fw)
-
     k = fw.graph["k"]
     green = k*np.sum(np.array([np.outer(c, c) for c in SCS]),axis=0)
     return green
@@ -661,19 +684,67 @@ def get_edge_dict(fw):
     es = fw.edges
     return {edge: i for i, edge in enumerate(fw.edges)}
 
-def Ci(fw, edge, G=None):
-    if G is None:
-        G = G_f(fw)
+# unique SCS bond
+def calc_Ci(fw, edge, SCS=None):
+    if SCS is None:
+        _, SCS = subbases(fw)
+    G = G_f(fw, SCS)
     k = fw.graph["k"]
-
     edge_dict = get_edge_dict(fw)
     index = edge_dict[edge]
-    edge_vec = np.zeros(len(G))
+    edge_vec = np.zeros(len(fw.edges))
     edge_vec[index] = 1
     C = k * G.dot(edge_vec)
+    return C
+
+# Unique SSS bond
+def calc_Si(fw, edge, SSS=None):
+    if SSS is None:
+        SSS, _ = subbases(fw)
+    edge_dict = get_edge_dict(fw)
+    index = edge_dict[edge]
+    edge_vec = np.zeros(len(fw.edges))
+    edge_vec[index] = 1
+    Si = np.zeros(len(fw.edges))
+    for s in SSS:
+        Si += np.outer(s,s) @ edge_vec
+
+    return Si
+
+# returns SCALED change in extensions
+def change_in_ext(fw, edge, tstar, SCS=None):
+    if SCS is None:
+        _, SCS = subbases(fw)
+    Ci = calc_Ci(fw, edge, SCS)
     
+    k = fw.graph["k"]
+    del_e = Ci * (Ci.dot(tstar)/(k*(1-Ci.dot(Ci))))
+    return del_e
 
 
+
+
+# get the rotation matrix required to rotate a to point in the direction of b
+# NOTE: assumes a and b are the same length (as in same dimension, not same mag)
+def get_rot_mat(a,b):
+    if len(a) != len(b):
+        print("UHOH vectors aren't same length")
+    n = len(a)
+    a_hat = a/np.linalg.norm(a)
+    b_hat = b/np.linalg.norm(b)
+    basis = scipy.linalg.orth(np.stack((a_hat,b_hat),axis=1))
+    u = basis[:,0]
+    v = basis[:,1]
+    cost= a_hat.dot(b_hat)
+    sint = np.sin(np.arccos(cost))
+    if cost == 1:
+        print("already parallel")
+    if cost == -1:
+        print("anti parallel")
+    # sint = np.linalg.norm(np.cross(u,v))
+    # from stack overflow: https://math.stackexchange.com/questions/197772/generalized-rotation-matrix-in-n-dimensional-space-around-n-2-unit-vector#comment453048_197778
+    A = np.eye(n) + sint*(np.outer(v,u) - np.outer(u,v)) + (cost -1)*(np.outer(u,u) + np.outer(v,v))
+    return A
 
 # NOTE: OLD VERSION
 # # get extensions from applied tension to framework
@@ -770,26 +841,104 @@ def cost_f(ns, nstars):
             cost += nj**2
         else:
             cost += (nj/njstar - 1)**2
+            if np.isnan(cost):
+                print(nj, njstar)
     return cost
 
+# drawing the strains resulting from applied forces
+def draw_strains_from_forces(fw, f, filename=None):
+    disps = displacements(fw, None, f)
+    exts = extensions(fw, None, disps)
+    strs = strains(fw, None, exts)
+    # drawing the nodes of the graph
+    fig, ax = plt.subplots(figsize=(20,10), frameon=False)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    nodeview = fw.nodes
+
+    pos = {node: nodeview[node]["position"] for node in nodeview}
+    # SETTING AXIS LIMITS
+    minx = np.inf
+    miny = np.inf
+    maxx = -np.inf
+    maxy = -np.inf
+    for val in pos.values():
+        minx = min(minx, val[0])
+        miny = min(miny, val[1])
+        maxx = max(maxx, val[0])
+        maxy = max(maxy, val[1])
+    xbuf = (maxx - minx) / 10
+    ybuf = (maxy - miny) / 10
+    buf = min(xbuf, ybuf)
+    plt.xlim(minx - buf, maxx + buf)
+    plt.ylim(miny - buf, maxy + buf)
+    # END SETTING AXIS LIMITS
+
+    e_labels=dict()
+    for i, edge in enumerate(fw.edges):
+        e_labels[edge] = np.round(strs[i], 1)
+
+    cmap = plt.cm.coolwarm
+    nx.draw_networkx_edges(fw, pos, edgelist=fw.edges, edge_color=strs,
+            width=4, edge_cmap=cmap, edge_vmin=-max(abs(strs)), edge_vmax=max(abs(strs)), with_labels=True)
+       
+    # bbox = dict(boxstyle="round", alpha=0.0)
+    nx.draw_networkx_edge_labels(fw, pos, e_labels, font_size=10)#, bbox=bbox)
+    # places where the force is being applied will be coloured green
+    applied_forces = dict()
+    for i in range(0, len(f), 2):
+        # if the force is non-zero 
+        if (f[i] != 0 or f[i+1] != 0):
+            # put the force into a dictionary
+            mag = np.sqrt(f[i]**2 + f[i+1]**2)
+            applied_forces[i//2] = (f[i]/mag, f[i+1]/mag)
+    for key in applied_forces.keys():
+        x, y = fw.nodes[key]["position"]
+        dx = applied_forces[key][0]*buf
+        dy = applied_forces[key][1]*buf
+        # plt.plot([x,x+applied_forces[key][0]*buf], [y,y+applied_forces[key][1]*buf], color='k', linestyle='-', linewidth=2)
+        plt.arrow(x, y, dx, dy, width=0.1*buf)
+
+
+    if not filename is None:
+        fig.savefig(filename, bbox_inches='tight')
+        
+    plt.show()
+ 
+
 # borrowing heavily from draw_tensions, trying to draw the strains on the bonds
-def draw_strains(fw, strains, source=None, target=None, ghost=False, filename=None):
+def draw_strains(fw, strs, source=None, target=None, ghost=False, filename=None):
     # works on a numpy array
-    strains = np.array(strains)
+    strs = np.array(strs)
     # drawing the nodes of the graph
     fig, ax = plt.subplots(figsize=(20,10))
     ax.set_aspect('equal')
     nodeview = fw.nodes
 
     pos = {node: nodeview[node]["position"] for node in nodeview}
+    # SETTING AXIS LIMITS
+    minx = np.inf
+    miny = np.inf
+    maxx = -np.inf
+    maxy = -np.inf
+    for val in pos.values():
+        minx = min(minx, val[0])
+        miny = min(miny, val[1])
+        maxx = max(maxx, val[0])
+        maxy = max(maxy, val[1])
+    xbuf = (maxx - minx) / 10
+    ybuf = (maxy - miny) / 10
+    plt.xlim(minx - xbuf, maxx + xbuf)
+    plt.ylim(miny - ybuf, maxy + ybuf)
+    # END SETTING AXIS LIMITS
 
     e_labels=dict()
     for i, edge in enumerate(fw.edges):
-        e_labels[edge] = np.round(strains[i], 1)
+        e_labels[edge] = np.round(strs[i], 1)
 
     cmap = plt.cm.coolwarm
-    nx.draw_networkx_edges(fw, pos, edgelist=fw.edges, edge_color=strains,
-            width=4, edge_cmap=cmap, edge_vmin=-max(abs(strains)), edge_vmax=max(abs(strains)), with_labels=True)
+    nx.draw_networkx_edges(fw, pos, edgelist=fw.edges, edge_color=strs,
+            width=4, edge_cmap=cmap, edge_vmin=-max(abs(strs)), edge_vmax=max(abs(strs)), with_labels=True)
     if ghost:
         ghost_es = set([edge for edge in fw.edges if fw.edges[edge]["lam"]==0])
         nx.draw_networkx_edges(fw, pos, edgelist=ghost_es, style="dashed")
@@ -820,7 +969,11 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
     true_cost = cost_f(ns, nstars)
     return true_cost
 
-# Run the tuning algorithm on a network for a given source, target, ratio
+# ============================================================================== 
+# TUNING FUNCTIONS
+# ============================================================================== 
+
+# Run the brute-force tuning algorithm on a network for a given source, target, ratio
 def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False, verbose=True):
     fw = fw_orig.copy()
     if source not in fw.edges or target not in fw.edges:
@@ -861,7 +1014,6 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         fw.edges[edge_to_remove]["lam"] = 0
         # test to see numerical error
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
-        print(f"True cost took {toc - tic:0.4f} seconds")
 
         if verbose:
             print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
@@ -871,7 +1023,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
 
     return fw
 # Run the tuning algorithm on a network for a given source, target, ratio USING SHERMAN-MORRISON UPDATING
-def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=100, draw=False, verbose=True):
+def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False, verbose=True):
     fw = fw_orig.copy()
     if source not in fw.edges or target not in fw.edges:
         fw.add_edges_from([source, target])
@@ -899,6 +1051,10 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
     Hbar = Hbar_mat(fw)
     Hbar_inv = Hbar_inv_mat(fw)
     while min_cost > cost_thresh and it < it_thresh:
+        # starting H inverse
+        # NOTE: recalculating before each edge removal
+        Hbar = Hbar_mat(fw)
+        Hbar_inv = Hbar_inv_mat(fw)
         costs = []
         exts_list = all_extensions(fw, tensions, Hbar, Hbar_inv)
         for i, exts in enumerate(exts_list):
@@ -917,11 +1073,7 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
 
         fw.edges[edge_to_remove]["lam"] = 0
         # test to see numerical error
-        import time
-        tic = time.perf_counter()
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
-        toc = time.perf_counter()
-        print(f"True cost took {toc - tic:0.4f} seconds")
 
         if verbose:
             print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
@@ -931,10 +1083,85 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
 
     return fw
 
+def GF_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False, verbose=True):
+    fw = fw_orig.copy()
+    if source not in fw.edges or target not in fw.edges:
+        fw.add_edges_from([source, target])
+        fw = add_lengths_and_stiffs(fw)
+
+    edge_dict = get_edge_dict(fw)
+
+    # modifying the framework to change two bonds to ghost bonds (source and target)
+    fw.edges[source]["lam"] = 0
+    fw.edges[target]["lam"] = 0
+    tensions = [0]*len(fw.edges)
+    tensions[edge_dict[source]] = tension
+    # starting_exts = extensions(fw, tensions)
+    # TESTING using gf extensions to start
+    Fhalf = Fhalf_mat(fw)
+    starting_exts = G_f(fw) @ tensions
+    starting_strs = strains(fw, None, Fhalf @ starting_exts)
+    # strains = exts_to_strains(fw, extensions(fw, tensions, debug=True))
+    if verbose:
+        print("initial strain ratio:",starting_strs[edge_dict[target]]/starting_strs[edge_dict[source]])
+    if draw:
+        draw_strains(fw, starting_strs, source, target, ghost=True)
+
+    # calculating ns test
+    it = 0
+    min_cost = np.inf
+    while min_cost > cost_thresh and it < 1:#it_thresh:
+        costs = []
+        edge_to_remove = None
+
+        _, SCS = subbases(fw)
+        for edge in fw.edges:
+            # calculate new extensions
+            del_exts = change_in_ext(fw, edge, tensions, SCS=SCS)
+            new_exts = starting_exts + del_exts
+            new_strs = strains(fw, None, Fhalf @ new_exts)
+
+            # calculate cost ratio for that edge
+            ns = [new_strs[edge_dict[target]] / new_strs[edge_dict[source]]]
+            cost = cost_f(ns, nstars)
+            print("edge, cost:", edge, cost)
+            if cost < min_cost:
+                min_cost = cost
+                edge_to_remove = edge
+        print("min cost, edge",min_cost, edge) 
+
+#         exts_list = all_extensions(fw, tensions, Hbar, Hbar_inv)
+#         for i, exts in enumerate(exts_list):
+#             if exts is None:
+#                 costs.append(np.inf)
+#             else:
+#                 strs = exts_to_strains(fw, exts)
+#                 ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
+#                 costs.append(cost_f(ns, nstars))
+#         min_cost = min(costs)
+#         index_to_remove = costs.index(min_cost)
+#         edge_to_remove = list(fw.edges)[index_to_remove]
+#         # update Hinv with the edge chosen
+#         Hbar, Hbar_inv = check_update_Hinv(fw, edge_to_remove,Hbar, Hbar_inv)
+#         # ok_(np.allclose(Hbar, Hbar @ Hbar_inv @ Hbar))
+
+#         fw.edges[edge_to_remove]["lam"] = 0
+#         # test to see numerical error
+#         true_cost = calc_true_cost(fw, source, target, nstars, tension)
+
+#         if verbose:
+#             print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+#             print("true cost:",true_cost)
+#             print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
+        it+=1
+
+    return fw
+
 
 # ============================================================================== 
 # ANIMATION FUNCTIONS
 # ============================================================================== 
+
 # calculate the energy of the configuration
 # accepts a displacement vector u and the framework as *args from minimizer
 # displacements are structured as [x0, y0, x1, y1, ..., xn, yn] where there are n nodes
@@ -999,7 +1226,7 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
     # writing out the graph
     # nx.write_gexf(fw, fileroot+"graph.gexf")
     for i in range(n):
-        strain_val = 0.5 *s_max * (i/(n-1))
+        strain_val = 0.2 *s_max * (i/(n-1))
         print("=========== ITERATION",str(i),"============")
         print("source strain val constraint:",strain_val)
         constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}

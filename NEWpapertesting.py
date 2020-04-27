@@ -4,6 +4,11 @@ from pebble_game import *
 from constructive_pebble_game import *
 from nose.tools import ok_
 import numpy as np
+import time
+import datetime
+import os
+
+fileroot = "images/"+str(datetime.date.today()) +"/"+ str(int(time.time())) + "/"
 
 def load_image( infilename ) :
     img = Image.open( infilename )
@@ -28,8 +33,8 @@ draw_framework(fw, ghost=True)
 
 
 # returns a tuned network
-source = (187,188)
-target = (0,1)
+source = (72, 96)
+target = (152, 165)
 nstars = [1.0]
 fw.add_edges_from([source, target])
 fw = add_lengths_and_stiffs(fw)
@@ -50,4 +55,5 @@ tensions[edge_dict[source]] = 1
 strs = strains(fw, tensions)
 print("target, source strains:",strs[edge_dict[target]], strs[edge_dict[source]])
 
-# ratios = animate(fw, source, target, "images/scale_R/", nstars, s_max=1, tensions=1)
+os.makedirs(fileroot)
+# ratios = animate(fw, source, target,fileroot, nstars, s_max=1, tensions=1)
