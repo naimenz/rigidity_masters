@@ -18,17 +18,30 @@ fw = make_nice_fw(40,1)
 # a = np.array([[1,1,1],[0,1,0],[1,1,0]])
 # b = (8,2,-1)
 
-# A = Hbar_mat(fw)
-# Ainv = Hbar_inv_mat(fw)
-# # np pinv works
-# ok_(np.allclose(A, A@Ainv@A))
-# edge = (0,5)
-# Au, Auinv = check_update_Hinv(fw, edge, A, Ainv)
-# fw.edges[edge]["lam"] = 0
-# An = Hbar_mat(fw)
-# # update matrix works
-# ok_(np.allclose(An, Au))
 
+fw = add_lengths_and_stiffs(fw, 5)
+A = Hbar_mat(fw)
+Ainv = Hbar_inv_mat(fw)
+# np pinv works
+ok_(np.allclose(A, A@Ainv@A))
+edge = (0,5)
+Au, Auinv = update_Hbarinv(fw, edge, A, Ainv)
+fw.edges[edge]["lam"] = 0
+An = Hbar_mat(fw)
+# update matrix works
+ok_(np.allclose(An, Au))
+
+fw = add_lengths_and_stiffs(fw, 5)
+A = H_mat(fw)
+Ainv = Hinv_mat(fw)
+# np pinv works
+ok_(np.allclose(A, A@Ainv@A))
+edge = (0,5)
+Au, Auinv = update_Hinv(fw, edge, A, Ainv)
+fw.edges[edge]["lam"] = 0
+An = H_mat(fw)
+# update matrix works
+ok_(np.allclose(An, Au))
 # Aupinv = np.linalg.pinv(Au)
 # ok_(np.allclose(Au, Au @ Aupinv @ Au))
 # # inverses close
@@ -36,10 +49,10 @@ fw = make_nice_fw(40,1)
 # # update inverse works
 # ok_(np.allclose(Au, Au @ Auinv @ Au))
 
-A = np.random.random((5,10))
-d = np.random.random(10)
-D = np.diag(d)
+# A = np.random.random((5,10))
+# d = np.random.random(10)
+# D = np.diag(d)
 
-prod = A @ D @ A.T
+# prod = A @ D @ A.T
 
-print(np.allclose(prod, prod.T))
+# print(np.allclose(prod, prod.T))

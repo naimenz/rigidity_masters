@@ -48,7 +48,7 @@ def create_framework(nodes, edges, positions):
 
 # get the lengths of each edge in the framework 
 # also add bulk modulus (lambda) of 1 (NOTE now 2 to avoid numerical issues?)
-# NOTE: I have no clue which modulus we're talking about,
+# I have no clue which modulus we're talking about,
 # but I now assume it's the Young's modulus
 def add_lengths_and_stiffs(fw, lam=50):
     # create a copy to add the lengths to and to return
@@ -64,7 +64,7 @@ def add_lengths_and_stiffs(fw, lam=50):
         l = np.sqrt(l)
         rv.edges[edge]["length"] = l
         rv.edges[edge]["lam"] = lam
-        rv.graph["k"] = 1/lam
+    rv.graph["k"] = lam
     return rv
 
 # creates the rigidity matrix for a d-dimensional framework
@@ -91,23 +91,17 @@ def rig_mat(fw, d=2):
             for k in range(d):
                 M[row, d*i+k] = (pos1[k] - pos2[k]) / edgeview[edge]["length"]
                 M[row, d*j+k] = (-pos1[k] + pos2[k]) / edgeview[edge]["length"]
-
     return M
 
 # generate the flexibility matrix (as defined in The Paper)
-# NOTE: we assume a constant material modulus (lam) of 1 (as I don't know anything about this)
-# because lam=1, and the diag is 1/ki = 1/(lam/length), we just get a diagonal matrix of lengths
-# NOTE: I don't know what to do about 0 stiffness, so atm i'll just set it to 0 manually
 def flex_mat(fw):
     es = fw.edges
     entries = [es[edge]["length"]/es[edge]["lam"] if es[edge]["lam"]!= 0 else 0 for edge in es]
-    # entries = [fw.edges[edge]["length"]/fw.edges[edge]["lam"] for edge in fw.edges]
     return np.diag(entries)
 
 # the square root of the flex matrix
 def Fhalf_mat(fw):
     F = flex_mat(fw)
-    # TESTING TO SEE IF NOT SCALED 0 STIFFNESS WILL FIX
     # basically having a 0 in F means a row of Q is killed completely
     # so instead i'm setting them to 1 to avoid any scaling
     for i in range(len(F)):
@@ -115,10 +109,10 @@ def Fhalf_mat(fw):
             F[i,i] = 1
     return np.sqrt(F)
 
-# in the scaled version, all edges have length 1, so it's just 1/lam
+# in the scaled version, all edges have length 1, so it's just 1/k
 def Fbar_mat(fw):
     es = fw.edges
-    entries = [fw.graph["k"] if es[edge]["lam"]!= 0 else 0 for edge in es]
+    entries = [1/fw.graph["k"] if es[edge]["lam"]!= 0 else 0 for edge in es]
     return np.diag(entries)
 
 def Qbar_mat(fw):
@@ -151,7 +145,7 @@ def Hbar_mat(fw):
 
 # calculate Hinv with identical bond stiffness (rescaled)
 def Hbar_inv_mat(fw):
-    Hbar_inv = np.linalg.pinv(Hbar_mat(fw))
+    Hbar_inv = np.linalg.pinv(Hbar_mat(fw), hermitian=True)
     return Hbar_inv
 
 # returns True if b is in the column space of a
@@ -198,7 +192,8 @@ def meyer_update(A, Ainv, c, d):
     # ok_(np.allclose(v, dt @ (np.eye(N) - Ainv @ A)))
     ud = x_dagger(u)
     vd = x_dagger(v)
-    beta = 1 + dt @ Ainv @ c #NOTE experimental subtracting 0.8
+    beta = 1 + dt @ Ainv @ c 
+    print("BETA IS:",beta)
 
     # NOTE: experimenting with saying c, d always in col space
     # because tbh, they might be theoretically but not numerically, i haven't really thought about it
@@ -302,16 +297,16 @@ def meyer_update(A, Ainv, c, d):
                 return inverse1()
     print("UHOH")
 
-def check_update_Hinv(fw, edge, H, Hinv):
+# Update the H and Hinv matrices with a rank 1 addition
+def update_Hinv(fw, edge, H, Hinv):
     edge_dict = get_edge_dict(fw)
     i= edge_dict[edge]
-    Qbar = Qbar_mat(fw)
+    Q = rig_mat(fw).T
 
-    # k = fw.edges[edge]["lam"] / fw.edges[edge]["length"]
-    k = fw.graph["k"]
-    qi = Qbar[:,i].reshape(-1,1)
+    k = fw.edges[edge]["lam"] / fw.edges[edge]["length"]
+    qi = Q[:,i].reshape(-1,1)
     # NOTE: inner product of these two is -k (I think)
-    u = -qi
+    u = -k*qi
     v = qi
     # print("u in col space, v in row space:", in_col_space(H, u), in_col_space(H.T, v))
     # print("rank H:", np.linalg.matrix_rank(H), H.shape)
@@ -319,19 +314,24 @@ def check_update_Hinv(fw, edge, H, Hinv):
     Hu, Hinv_u = H + u @ v.T, meyer_update(H, Hinv, u, v)
     return Hu, Hinv_u
 
-# function to update the inverse using Sherman-Morrison
-def update_Hinv(fw, edge, Hinv):
+# update the Hbar and Hbarinv matrices
+# note it's different to just Hinv
+def update_Hbarinv(fw, edge, H, Hinv):
     edge_dict = get_edge_dict(fw)
     i= edge_dict[edge]
     Qbar = Qbar_mat(fw)
 
     k = fw.graph["k"]
+    print("K IN UPDATE:",k)
     qi = Qbar[:,i].reshape(-1,1)
     # NOTE: inner product of these two is -k (I think)
-    u = -k*qi
+    u = -(k)*qi
     v = qi
-    Hinv_u = meyer_update(Hinv, u, v)
-    return Hinv_u
+    # print("u in col space, v in row space:", in_col_space(H, u), in_col_space(H.T, v))
+    # print("rank H:", np.linalg.matrix_rank(H), H.shape)
+    # print("denom is:",(1 + v.T @ Hinv @ u))
+    Hu, Hinv_u = H + u @ v.T, meyer_update(H, Hinv, u, v)
+    return Hu, Hinv_u
 
 # convert a delaunay object into a list of edges that can be used to create a framework
 def delaunay_to_edges(d):
