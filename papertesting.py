@@ -34,15 +34,15 @@ nstars = [1.0]
 fw.add_edges_from([source, target])
 fw = add_lengths_and_stiffs(fw)
 
-import time
-tic = time.perf_counter()
-fw = SM_tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, verbose=True)
-toc = time.perf_counter()
-print(f"SM took {toc - tic:0.4f} seconds")
+# import time
+# tic = time.perf_counter()
+# fw = SM_tune_network(fw, source, target, tension=1, nstars=nstars, draw=True, verbose=True)
+# toc = time.perf_counter()
+# print(f"SM took {toc - tic:0.4f} seconds")
 
-# red_edges = [(1,5),(9,18),(37,46),(54,69),(77,84),(174,173), (0,1), (187,188)]
-# for edge in red_edges:
-#     fw.edges[edge]["lam"] = 0 
+red_edges = [(1,5),(9,18),(37,46),(54,69),(77,84),(174,173), (0,1), (187,188)]
+for edge in red_edges:
+    fw.edges[edge]["lam"] = 0 
 draw_framework(fw, ghost=True)
 tensions = [0]*len(fw.edges)
 edge_dict = get_edge_dict(fw)
@@ -50,4 +50,4 @@ tensions[edge_dict[source]] = 1
 strs = strains(fw, tensions)
 print("target, source strains:",strs[edge_dict[target]], strs[edge_dict[source]])
 
-# ratios = animate(fw, source, target, "images/scale_R/", nstars, s_max=1, tensions=1)
+ratios = animate(fw, source, target, nstars, fileroot="images/ROCKS_EDGES/", s_max=1, tensions=1)

@@ -10,7 +10,10 @@ from scipy.spatial import Delaunay
 from scipy.optimize import minimize
 from scipy.optimize import linprog
 
+import datetime
+import time
 import sys
+import os
 
 # simple function wrapping graph creation in nx
 # NOTE: sorts the edges before adding them to the graph
@@ -47,7 +50,7 @@ def create_framework(nodes, edges, positions):
 # also add bulk modulus (lambda) of 1 (NOTE now 2 to avoid numerical issues?)
 # NOTE: I have no clue which modulus we're talking about,
 # but I now assume it's the Young's modulus
-def add_lengths_and_stiffs(fw, lam=5):
+def add_lengths_and_stiffs(fw, lam=50):
     # create a copy to add the lengths to and to return
     rv = fw.copy()
     for edge in rv.edges:
@@ -195,7 +198,7 @@ def meyer_update(A, Ainv, c, d):
     # ok_(np.allclose(v, dt @ (np.eye(N) - Ainv @ A)))
     ud = x_dagger(u)
     vd = x_dagger(v)
-    beta = 1 + dt @ Ainv @ c
+    beta = 1 + dt @ Ainv @ c #NOTE experimental subtracting 0.8
 
     # NOTE: experimenting with saying c, d always in col space
     # because tbh, they might be theoretically but not numerically, i haven't really thought about it
@@ -246,6 +249,7 @@ def meyer_update(A, Ainv, c, d):
             # beta == 0
             if np.isclose(beta, 0):
                 # c in R(A), d in R(A*), beta = 0
+                # print("BETA IS ZERO:", beta)
                 return inverse6()
 
             # beta != 0 
@@ -254,6 +258,7 @@ def meyer_update(A, Ainv, c, d):
                 inv3 = inverse3()
                 inv5 = inverse5()
                 ok_("3 and 5 CLOSE?:",np.allclose(inv3, inv5))
+                # print("GREATER THAN ZERO", beta)
                 return(inv5)
 
         # d not in R(A*)
@@ -302,10 +307,11 @@ def check_update_Hinv(fw, edge, H, Hinv):
     i= edge_dict[edge]
     Qbar = Qbar_mat(fw)
 
+    # k = fw.edges[edge]["lam"] / fw.edges[edge]["length"]
     k = fw.graph["k"]
     qi = Qbar[:,i].reshape(-1,1)
     # NOTE: inner product of these two is -k (I think)
-    u = -k*qi
+    u = -qi
     v = qi
     # print("u in col space, v in row space:", in_col_space(H, u), in_col_space(H.T, v))
     # print("rank H:", np.linalg.matrix_rank(H), H.shape)
@@ -816,6 +822,7 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
 #                 edge_list = list(fw.edges)
 #                 for i in range(len(edge_list)):
 #                     ext[i] = ext[i] / fw.edges[edge_list[i]]["length"]
+                # NOTE: checking if the removed edge introduces zero modes
                 exts.append(ext)
             else:
                 # if we don't consider this edge, just say None
@@ -973,7 +980,7 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
 # ============================================================================== 
 
 # Run the brute-force tuning algorithm on a network for a given source, target, ratio
-def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False, verbose=True):
+def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=100, draw=False, verbose=True):
     fw = fw_orig.copy()
     if source not in fw.edges or target not in fw.edges:
         fw.add_edges_from([source, target])
@@ -997,7 +1004,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
     # calculating ns test
     it = 0
     min_cost = np.inf
-    while min_cost > cost_thresh and it < it_thresh:
+    while np.sqrt(min_cost) > cost_thresh and it < it_thresh:
         costs = []
         exts_list = all_extensions(fw, tensions)
         for i, exts in enumerate(exts_list):
@@ -1015,7 +1022,9 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
         if verbose:
-            print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+            print("=========== TUNE ITERATION",str(it + 1),"============")
+            # print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+            print("cost:",min_cost,"removed:",edge_to_remove)
             print("true cost:",true_cost)
             print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
         it+=1
@@ -1063,9 +1072,21 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
                 strs = exts_to_strains(fw, exts)
                 ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
                 costs.append(cost_f(ns, nstars))
-        min_cost = min(costs)
-        index_to_remove = costs.index(min_cost)
-        edge_to_remove = list(fw.edges)[index_to_remove]
+        # making sure the edge doesn't introduce a zero mode
+        edge_passed = False
+        while not edge_passed:
+            min_cost = min(costs)
+            index_to_remove = costs.index(min_cost)
+            edge_to_remove = list(fw.edges)[index_to_remove]
+            # NOTE: checking if introduces a zero mode
+            Si = calc_Si(fw, edge_to_remove)
+            Si_sq = np.inner(Si, Si)
+            if np.isclose(Si_sq, 0):
+                costs[index_to_remove] = np.inf
+                print("ZERO MODE INTRODUCED:", edge_to_remove)
+            else:
+                edge_passed = True
+
         # update Hinv with the edge chosen
         H, H_inv = check_update_Hinv(fw, edge_to_remove,H, H_inv)
         # ok_(np.allclose(Hbar, Hbar @ Hbar_inv @ Hbar))
@@ -1075,10 +1096,13 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
         if verbose:
-            print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+            print("=========== TUNE ITERATION",str(it + 1),"============")
+            # print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
+            print("cost:",min_cost,"removed:",edge_to_remove)
             print("true cost:",true_cost)
             print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
         it+=1
+
 
     return fw
 
@@ -1214,7 +1238,15 @@ def update_pos(fw, u):
     return fwc
 
 # # getting the max strain on the source edge
-def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
+def animate(fw, source, target, nstars, fileroot=None, s_max=1, tensions=1):
+    # NOTE: ALWAYS SAVING IMAGE
+    if fileroot is None:
+        fileroot = "images/"+str(datetime.date.today()) +"/"+ str(int(time.time())) + "/"
+        os.makedirs(fileroot)
+    else: 
+        from pathlib import Path
+        Path(fileroot).mkdir(parents=True, exist_ok=True)
+
     # # number of frames in the animation
     n = 30
     real_ratios_list = []
@@ -1222,11 +1254,9 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
     tensions = [0]*len(fw.edges)
     tensions[edge_dict[source]] = 1
     u0 = np.zeros(len(fw.nodes) * 2)
-    # writing out the graph
-    # nx.write_gexf(fw, fileroot+"graph.gexf")
     for i in range(n):
         strain_val = 0.2 *s_max * (i/(n-1))
-        print("=========== ITERATION",str(i),"============")
+        print("=========== ANIMATE ITERATION",str(i + 1),"============")
         print("source strain val constraint:",strain_val)
         constraints = {"type":"eq", "fun":source_strain, "args":(fw, source, strain_val)}
         mind = minimize(energy, u0, args=(fw), constraints=constraints)
@@ -1240,7 +1270,7 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
         real_source_strain = real_strains[edge_dict[source]] #/ fw.edges[source]["length"]
         print("target, source strain:",real_target_strain, real_source_strain)
         real_ratio = real_target_strain/real_source_strain
-        if real_ratio != np.nan:
+        if not np.isnan(real_ratio):
             real_ratios_list.append(real_ratio)
         print("full nonlinear strain ratio:", real_ratio)
         draw_framework(update_pos(fw, mind.x), filename=fileroot+"anim_"+str(i)+".png",ghost=True, source=source, target=target)
@@ -1250,8 +1280,15 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
         with open(fileroot+'log.log', 'a') as f:
               np.savetxt(f,u0)
               f.write(',')
-        
-    
+
+    # save the edges of the graph (positions are written in the log)
+    with open(fileroot+'graph.log', 'w') as f:
+          f.write(str(source)+"\n")
+          f.write(str(target)+"\n")
+          f.write(str(nstars)+"\n")
+          np.savetxt(f,fw.edges)
+          f.write(",\n")
+          f.write(str(fw.nodes(data=True)))
 
     fig = plt.figure()
     plt.plot(real_ratios_list)
@@ -1259,3 +1296,80 @@ def animate(fw, source, target, fileroot, nstars, s_max=1, tensions=1):
     plt.show()
     fig.savefig(fileroot+"ratio.png",bbox_inches="tight")
     return real_ratios_list
+
+# read the displacements from my poorly formatted log file
+def read_disps(filename):
+    disps_list = [[]]
+    with open(filename) as fp:
+        i = 0 
+        for line in fp:
+            # if this is the start of a new iteration:
+            if line[0] == ",":
+                # if it's not just a comma
+                if len(line) > 1:
+                    i += 1
+                    # add a new list to hold a vector of positions
+                    disps_list.append([])
+                    # drop the comma
+                    line = line[1:]
+                # if it's ajust a comma
+                else:
+                    continue
+
+            disps_list[i].append(float(line))
+    return np.array(disps_list)
+
+# read the poorly formatted graph log file
+def read_graphlog(filename):
+    from ast import literal_eval
+    with open(filename) as fp:
+        edge_list = []
+        comma = False
+        for i, line in enumerate(fp):
+            if i == 0 :
+                source = literal_eval(line) 
+            elif i == 1:
+                target = literal_eval(line) 
+            elif i ==2:
+                nstars = literal_eval(line)
+            else:
+                if line == ',\n':
+                    comma = True
+                else:
+                    if not comma:
+                        edge_list.append(tuple(int(float(x)) for x in line.split(" ")))
+                    else:
+                        pos = literal_eval(line)
+        fw = nx.Graph()
+        fw.add_nodes_from(pos)
+        fw.add_edges_from(edge_list)
+        fw = add_lengths_and_stiffs(fw)
+        return fw, source, target, nstars
+
+# reconstruct the optimisation process using just the disps
+def ratios_list_from_disps(fw, disps_list, source, target):
+    R = rig_mat(fw)
+    edge_dict = get_edge_dict(fw)
+    ratios_list=[]
+    for disps in disps_list:
+        exts = R @ disps
+        strs = exts_to_strains(fw, exts)
+        # adjusting for proper strain calculation
+        target_strain = strs[edge_dict[target]] 
+        source_strain = strs[edge_dict[source]]
+        ratio = target_strain/source_strain
+        if not np.isnan(ratio):
+            ratios_list.append(ratio)
+
+    return ratios_list
+
+def plot_ratios_list(ratios_list, nstars):
+    nstar = nstars[0]
+    ymin = min(nstar, min(ratios_list), 0)
+    ymax = max(nstar, max(ratios_list), 0)
+    ybuf = (ymax - ymin) / 10
+    fig = plt.figure()
+    plt.ylim(ymin - ybuf, ymax + ybuf)
+    plt.plot(ratios_list)
+    plt.axhline(nstar,linestyle="--")
+    plt.show()
