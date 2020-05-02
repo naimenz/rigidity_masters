@@ -719,10 +719,11 @@ def get_edge_dict(fw):
     return {edge: i for i, edge in enumerate(fw.edges)}
 
 # unique SCS bond
-def calc_Ci(fw, edge, SCS=None):
+def calc_Ci(fw, edge, SCS=None, G=None):
     if SCS is None:
         _, SCS = subbases(fw)
-    G = G_f(fw, SCS)
+    if G is None:
+        G = G_f(fw, SCS)
     k = fw.graph["k"]
     edge_dict = get_edge_dict(fw)
     index = edge_dict[edge]
@@ -761,9 +762,12 @@ def gram_schmidt(vectors, start=None):
 
 
 # get a basis for the set V from 'modifying multiply bonds'
-def V_basis(fw, rem_edges=None, SCS=None):
+def V_basis(fw, rem_edges=None, SCS=None, G=None):
     if SCS is None:
          _, SCS = subbases(fw)
+    # if we haven't passed in a green's function
+    if G is None:
+        G = G_f(fw, SCS)
     # first we find all the ghost bonds, and the one we want to change (if it exists)
     if not rem_edges is None:
         B = rem_edges
@@ -777,7 +781,7 @@ def V_basis(fw, rem_edges=None, SCS=None):
     # now we find V, which is all their unique SCS vectors normalised
     V = []
     for edge in B:
-        Ci = calc_Ci(fw, edge, SCS)
+        Ci = calc_Ci(fw, edge, SCS, G)
         V.append(Ci/np.sqrt(np.inner(Ci, Ci)))
     V_orthonorm = gram_schmidt(V, start=None)
     return V_orthonorm
@@ -1057,7 +1061,10 @@ def calc_true_cost(fw_orig, source, target, nstars, tension=1):
 # ============================================================================== 
 
 # Run the brute-force tuning algorithm on a network for a given source, target, ratio
-def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=100, draw=False, verbose=True):
+def BF_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=100, draw=False, verbose=True):
+    print("========================================")
+    print("========== STARTING BF TUNING ==========")
+    print("========================================")
     fw = fw_orig.copy()
     if source not in fw.edges or target not in fw.edges:
         fw.add_edges_from([source, target])
@@ -1099,7 +1106,7 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
         if verbose:
-            print("=========== TUNE ITERATION",str(it + 1),"============")
+            print("=========== BF TUNING ITERATION",str(it + 1),"============")
             # print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
             print("cost:",min_cost,"removed:",edge_to_remove)
             print("true cost:",true_cost)
@@ -1108,7 +1115,10 @@ def tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0
 
     return fw
 # Run the tuning algorithm on a network for a given source, target, ratio USING SHERMAN-MORRISON UPDATING
-def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False, verbose=True):
+def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=100, draw=False, verbose=True):
+    print("========================================")
+    print("========== STARTING SM TUNING ==========")
+    print("========================================")
     fw = fw_orig.copy()
     if source not in fw.edges or target not in fw.edges:
         fw.add_edges_from([source, target])
@@ -1135,7 +1145,7 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
     # starting H inverse
     H = H_mat(fw)
     H_inv = Hinv_mat(fw)
-    while min_cost > cost_thresh and it < it_thresh:
+    while np.sqrt(min_cost) > cost_thresh and it < it_thresh:
         # starting H inverse
         # NOTE: recalculating before each edge removal
         H = H_mat(fw)
@@ -1152,6 +1162,10 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
         # making sure the edge doesn't introduce a zero mode
         edge_passed = False
         while not edge_passed:
+            smalls = sorted(costs)[:10]
+            smalls_edges = [list(fw.edges)[costs.index(x)] for x in smalls]
+            print("10 smallest costs:", smalls)
+            print("10 smallest cost edges (ordered):", smalls_edges)
             min_cost = min(costs)
             index_to_remove = costs.index(min_cost)
             edge_to_remove = list(fw.edges)[index_to_remove]
@@ -1173,7 +1187,7 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
         if verbose:
-            print("=========== TUNE ITERATION",str(it + 1),"============")
+            print("=========== SM TUNING ITERATION",str(it + 1),"============")
             # print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
             print("cost:",min_cost,"removed:",edge_to_remove)
             print("true cost:",true_cost)
@@ -1207,10 +1221,12 @@ def calc_starting_exts(fw, tstar, V):
     return starting_exts
 
 # calculate the change when changing one bond to zero stiffness
-def change_in_exts(fw, edge, tensions, SCS=None, new_stiff=0, Fbar_inv=None):
+def change_in_exts(fw, edge, tensions, SCS=None, G=None, new_stiff=0, Fbar_inv=None):
     if SCS is None:
         _, SCS = subbases(fw)
-    V = V_basis(fw, rem_edges=[edge], SCS=SCS)
+    if G is None:
+        G = G_f(fw, SCS)
+    V = V_basis(fw, rem_edges=[edge], SCS=SCS, G=G)
     change = np.zeros((len(fw.edges)))
     # calculate change in Kaa' so we can calculate change in exts
     # first we modify Fbar to set edge stiffness to 0
@@ -1233,51 +1249,47 @@ def change_in_exts(fw, edge, tensions, SCS=None, new_stiff=0, Fbar_inv=None):
 
 # perform one step of the algorithm
 def GF_one_step(fw, source, target, tension=1, nstars=[1.0]):
-    # establishing source and target
-    fw.add_edges_from([source, target])
-    fw = add_lengths(fw)
     edge_dict = get_edge_dict(fw)
-    fw.edges[source]["lam"] = 0
-    fw.edges[target]["lam"] = 0
-
     source_i, target_i = edge_dict[source], edge_dict[target]
     # tension on source bond
     tensions = np.zeros(len(fw.edges))
     tensions[source_i] = 1
 
     SSS, SCS = subbases(fw)
-    V = V_basis(fw, rem_edges=None, SCS=SCS)
+    G = G_f(fw, SCS)
+    Fhalf = Fhalf_mat(fw)
+    V = V_basis(fw, rem_edges=None, SCS=SCS, G=G)
     starting_exts = calc_starting_exts(fw, tensions, V)
+    starting_strs = strains(fw, None, Fhalf @ starting_exts)
+
+    starting_ns = [starting_strs[target_i] / starting_strs[source_i]]
+    cost = cost_f(starting_ns, nstars)
 
     # for each edge, calculate the change in extensions
     k = fw.graph["k"]
-    Fhalf = Fhalf_mat(fw)
     cost_list = []
-    nstars = [1.0]
     old_Fbar_inv = np.linalg.pinv(Fbar_mat(fw))
     for i, edge in enumerate(fw.edges):
         # we ignore ghost edges as we can't double-remove them
         if fw.edges[edge]["lam"] == 0:
             cost_list.append(np.inf)
         else:
-            change = change_in_exts(fw, edge, tensions, SCS)
-            
-            if fw.edges[edge]["lam"] == 0:
-                print("LAM 0 CHANGE:",change)
-            # combine change with starting extensions
+            change = change_in_exts(fw, edge, tensions, SCS, G)
+            # combine change with starting extensions and get strains
             new_exts = starting_exts + change
-
             new_strs = strains(fw, None, Fhalf @ new_exts)
 
-            # print(new_strs[target_i], new_strs[source_i])
             ns = [new_strs[target_i] / new_strs[source_i]]
             cost = cost_f(ns, nstars)
-
             cost_list.append(cost)
 
     # making sure the edge doesn't introduce a zero mode
     edge_passed = False
     while not edge_passed:
+        smalls = sorted(cost_list)[:10]
+        smalls_edges = [list(fw.edges)[cost_list.index(x)] for x in smalls]
+        print("10 smallest costs:", smalls)
+        print("10 smallest cost edges (ordered):", smalls_edges)
         min_cost = min(cost_list)
         index_to_remove = cost_list.index(min_cost)
         edge_to_remove = list(fw.edges)[index_to_remove]
@@ -1292,9 +1304,38 @@ def GF_one_step(fw, source, target, tension=1, nstars=[1.0]):
     fw.remove_edges_from([edge_to_remove])
 
     true_cost = calc_true_cost(fw, source, target, nstars, tension=1)
-    print("min cost, true cost:", min_cost, true_cost)
-    print("medge:", edge_to_remove)
-    return fw, min_cost, edge_to_remove
+    return fw, min_cost, true_cost, edge_to_remove
+ 
+# tune using the green's function based algorithm from the paper
+def GF_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.01, it_thresh=100):
+    print("========================================")
+    print("========== STARTING GF TUNING ==========")
+    print("========================================")
+    # copying for tuning 
+    fw = fw_orig.copy()
+    # establishing source and target
+    fw.add_edges_from([source, target])
+    fw = add_lengths(fw)
+    edge_dict = get_edge_dict(fw)
+    fw.edges[source]["lam"] = 0
+    fw.edges[target]["lam"] = 0
+    # copy for returning
+    rv = fw.copy()
+    min_cost = np.inf
+    removed_edges = []
+    it = 1
+    while np.sqrt(min_cost) > cost_thresh and it < it_thresh:
+        print("============== GF TUNING ITERATION",it, "===============")
+        fw, min_cost, true_cost, edge_to_remove = GF_one_step(fw, source, target, 1, nstars)
+        removed_edges.append(edge_to_remove)
+        print("cost:",min_cost,"removed:",edge_to_remove)
+        print("true cost:",true_cost)
+        print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
+        it += 1
+
+    for edge in removed_edges:
+        rv.edges[edge]["lam"] = 0
+    return rv
 
 
 

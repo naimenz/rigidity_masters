@@ -23,18 +23,5 @@ fw = make_nice_fw(50,1)
 source = (39,40)
 target = (31,42)
 
-     return fw, min_cost, edge_to_remove
-
-fwc = SM_tune_network(fw, source, target, cost_thresh=0.0001)
-min_cost = np.inf
-medges = []
-it = 0
-while min_cost > 0.00001:
-    it += 1
-    print("============== ITERATION",it, "===============")
-    fw, min_cost, medge = GF_one_step(fw, source, target, 1, [1.0])
-    medges.append(medge)
-
-
-
-# fw = SM_tune_network(fw, source, target, 1, nstars)
+fwc = SM_tune_network(fw, source, target) 
+fw = GF_tune_network(fw, source, target)
