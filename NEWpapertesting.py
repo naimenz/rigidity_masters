@@ -51,25 +51,12 @@ exts = extensions(fw, tensions)
 
 green = G_f(fw, SCS)
 
-# NOTE: test to see if different displacements affect energy
-def scaled_displacements(fw, tstar):
-    Qbar = Qbar_mat(fw)
-    # F = Fbar_mat(fw)
-    # Finv = np.linalg.pinv(F, hermitian=True)
-    # H = Qbar @ Finv @ Qbar.T
-    # Hinv = np.linalg.pinv(H, hermitian=True)
-    Hinv = Hbar_inv_mat(fw)
-
-    u = Hinv @ Qbar @ tstar
-
-    return u
-
 # print(rig_mat)
 # R = rig_mat(fw)
 # print(np.inner(R[1], R[1]))
 
 # CHECKING DISPLACEMENT STUFF
-fw = add_lengths_and_stiffs(fw, 1)
+fw = add_lengths_and_stiffs(fw, 2)
 print("bond stiffness:", fw.graph["k"])
 tensions = np.zeros(len(fw.edges))
 edge_dict = get_edge_dict(fw)
@@ -88,7 +75,12 @@ print("Energy scaled H :", 0.5 * disps @ Hbar @ disps.T)
 print("#######################################################################################")
 #######################################################################################
 
+add_edges = [(90,92), (0,193), (19,154)]
+fw.add_edges_from(add_edges)
 fw = add_lengths_and_stiffs(fw, 2)
+# for edge in add_edges:
+#     fw.edges[edge]["lam"] = 0
+
 print("bond stiffness:", fw.graph["k"])
 
 tensions = np.zeros(len(fw.edges))

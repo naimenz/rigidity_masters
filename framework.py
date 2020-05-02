@@ -46,6 +46,22 @@ def create_framework(nodes, edges, positions):
     fw = add_lengths_and_stiffs(fw)
     return fw
 
+# add only the lengths so as not to change already defined stiffnesses
+def add_lengths(fw):
+    # create a copy to add the lengths to and to return
+    rv = fw.copy()
+    for edge in rv.edges:
+        v1 = edge[0]
+        v2 = edge[1]
+        pos1 = rv.nodes[v1]["position"]
+        pos2 = rv.nodes[v2]["position"]
+        l = 0
+        for i in range(len(pos1)):
+            l += (pos1[i] - pos2[i])**2
+        l = np.sqrt(l)
+        rv.edges[edge]["length"] = l
+    return rv
+
 # get the lengths of each edge in the framework 
 # also add bulk modulus (lambda) of 1 (NOTE now 2 to avoid numerical issues?)
 # I have no clue which modulus we're talking about,
@@ -148,6 +164,19 @@ def Hbar_inv_mat(fw):
     Hbar_inv = np.linalg.pinv(Hbar_mat(fw), hermitian=True)
     return Hbar_inv
 
+# NOTE: test to see if different displacements affect energy
+def scaled_displacements(fw, tstar):
+    Qbar = Qbar_mat(fw)
+    # F = Fbar_mat(fw)
+    # Finv = np.linalg.pinv(F, hermitian=True)
+    # H = Qbar @ Finv @ Qbar.T
+    # Hinv = np.linalg.pinv(H, hermitian=True)
+    Hinv = Hbar_inv_mat(fw)
+
+    u = Hinv @ Qbar @ tstar
+
+    return u
+
 # returns True if b is in the column space of a
 # works by checking if there is a linear comb of the cols of a that gives b
 def in_col_space(a,b):
@@ -193,7 +222,7 @@ def meyer_update(A, Ainv, c, d):
     ud = x_dagger(u)
     vd = x_dagger(v)
     beta = 1 + dt @ Ainv @ c 
-    print("BETA IS:",beta)
+    # print("BETA IS:",beta)
 
     # NOTE: experimenting with saying c, d always in col space
     # because tbh, they might be theoretically but not numerically, i haven't really thought about it
@@ -682,7 +711,7 @@ def G_f(fw, SCS=None):
     if SCS is None:
         _, SCS = subbases(fw)
     k = fw.graph["k"]
-    green = k*np.sum(np.array([np.outer(c, c) for c in SCS]),axis=0)
+    green = (1/k)*np.sum(np.array([np.outer(c, c) for c in SCS]),axis=0)
     return green
 
 # function to stop me doing this all the time
@@ -812,7 +841,7 @@ def all_extensions(fw, tstar, H=None, Hinv=None):
         # scaling extensions back
         for edge in fw.edges:
             if fw.edges[edge]["lam"] != 0:
-                H_new, Hinv_bar = check_update_Hinv(fw, edge,H, Hinv)
+                H_new, Hinv_bar = update_Hinv(fw, edge,H, Hinv)
                 # if not (np.allclose(H_new, H_new @ Hinv_bar @ H_new)):
                     # print("FAILED IN ALL EXTS")
 
@@ -848,7 +877,7 @@ def cost_f(ns, nstars):
         else:
             cost += (nj/njstar - 1)**2
             if np.isnan(cost):
-                print(nj, njstar)
+                print("cost nan:",nj, njstar)
     return cost
 
 # drawing the strains resulting from applied forces
@@ -1088,7 +1117,7 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
                 edge_passed = True
 
         # update Hinv with the edge chosen
-        H, H_inv = check_update_Hinv(fw, edge_to_remove,H, H_inv)
+        H, H_inv = update_Hinv(fw, edge_to_remove,H, H_inv)
         # ok_(np.allclose(Hbar, Hbar @ Hbar_inv @ Hbar))
 
         fw.edges[edge_to_remove]["lam"] = 0
