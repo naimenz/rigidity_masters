@@ -66,7 +66,7 @@ def add_lengths(fw):
 # also add bulk modulus (lambda) of 1 (NOTE now 2 to avoid numerical issues?)
 # I have no clue which modulus we're talking about,
 # but I now assume it's the Young's modulus
-def add_lengths_and_stiffs(fw, lam=50):
+def add_lengths_and_stiffs(fw, lam=2):
     # create a copy to add the lengths to and to return
     rv = fw.copy()
     for edge in rv.edges:
@@ -666,7 +666,6 @@ def extensions(fw, tstar, disps=None, debug=False):
     if not (disps is None):
         R = rig_mat(fw, 2)
         exts = R.dot(disps)
-
     else:
         u, R = displacements(fw, tstar, passR=True, debug=debug)
         exts = R.dot(u)
@@ -746,18 +745,67 @@ def calc_Si(fw, edge, SSS=None):
 
     return Si
 
-# returns SCALED change in extensions
-def change_in_ext(fw, edge, tstar, SCS=None):
+# Code for gram_schmidt modified to allow a starting basis from:
+# https://gist.github.com/iizukak/1287876/edad3c337844fac34f7e56ec09f9cb27d4907cc7#gistcomment-1871542
+def gram_schmidt(vectors, start=None):
+    if not start is None:
+        basis = list(start)
+    else:
+        basis = []
+    for v in vectors:
+        w = v - np.sum( np.dot(v,b)*b  for b in basis )
+        if (w > 1e-10).any():  
+            basis.append(w/np.linalg.norm(w))
+    return np.array(basis)
+
+
+
+# get a basis for the set V from 'modifying multiply bonds'
+def V_basis(fw, rem_edges=None, SCS=None):
+    if SCS is None:
+         _, SCS = subbases(fw)
+    # first we find all the ghost bonds, and the one we want to change (if it exists)
+    if not rem_edges is None:
+        B = rem_edges
+    else:
+        B = []
+
+    es = fw.edges
+    for edge in es:
+        if es[edge]["lam"] == 0:
+            B.append(edge)
+    # now we find V, which is all their unique SCS vectors normalised
+    V = []
+    for edge in B:
+        Ci = calc_Ci(fw, edge, SCS)
+        V.append(Ci/np.sqrt(np.inner(Ci, Ci)))
+    V_orthonorm = gram_schmidt(V, start=None)
+    return V_orthonorm
+
+# tilde Kaa', which is matrix elements
+def Kaabar_mat(fw, V, Fbar_inv=None):
+    if Fbar_inv is None:
+        Fbar_inv = np.linalg.pinv(Fbar_mat(fw))
+    Kaabar = np.zeros((len(V), len(V)))
+    for i, a in enumerate(V):
+        ca = a.reshape(-1,1)
+        for j, ap in enumerate(V):
+            cap = ap.reshape(-1,1)
+            Kaabar[i,j] = ap.T @ Fbar_inv @ a
+    return Kaabar
+
+# inverse Kaa'bar matrix for S19 and S20
+# NOTE: should be invertible so we use inv so that it throws an error if not
+def Kaabar_inv_mat(fw, V, Fbar_inv=None):
+    return np.linalg.inv(Kaabar_mat(fw, V, Fbar_inv))
+
+# can we simply apply gram-schmidt to get a rotated ortho basis wrt V?
+# these should be the tilde ca s from 'modifying multiple bonds'
+def calc_rot_basis(fw, V, SCS=None):
     if SCS is None:
         _, SCS = subbases(fw)
-    Ci = calc_Ci(fw, edge, SCS)
-    
-    k = fw.graph["k"]
-    del_e = Ci * (Ci.dot(tstar)/(k*(1-Ci.dot(Ci))))
-    return del_e
-
-
-
+    basis = gram_schmidt(SCS, V)
+    return basis
 
 # get the rotation matrix required to rotate a to point in the direction of b
 # NOTE: assumes a and b are the same length (as in same dimension, not same mag)
@@ -1135,79 +1183,119 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
 
     return fw
 
-def GF_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thresh=0.001, it_thresh=100, draw=False, verbose=True):
-    fw = fw_orig.copy()
-    if source not in fw.edges or target not in fw.edges:
-        fw.add_edges_from([source, target])
-        fw = add_lengths_and_stiffs(fw)
+# ============================================================================== 
+#  GF TUNING FUNCTIONS
+# ============================================================================== 
 
+def calc_starting_exts(fw, tstar, V):
+    SSS, SCS = subbases(fw)
+    rot_basis = calc_rot_basis(fw, V, SCS)
+
+    k = fw.graph["k"]
+
+    starting_exts = np.zeros((len(fw.edges)))
+    Kaabar_inv = Kaabar_inv_mat(fw, V)
+    for i, a in enumerate(V):
+        ca = a.reshape(-1,1)
+        for j, ap in enumerate(V):
+            cap = ap.reshape(-1,1)
+            starting_exts += ca @ (Kaabar_inv[i,j] * cap.T) @ tstar
+    for c in rot_basis:
+        if not c in V:
+            starting_exts += (1/k) * np.outer(c,c) @ tstar
+
+    return starting_exts
+
+# calculate the change when changing one bond to zero stiffness
+def change_in_exts(fw, edge, tensions, SCS=None, new_stiff=0, Fbar_inv=None):
+    if SCS is None:
+        _, SCS = subbases(fw)
+    V = V_basis(fw, rem_edges=[edge], SCS=SCS)
+    change = np.zeros((len(fw.edges)))
+    # calculate change in Kaa' so we can calculate change in exts
+    # first we modify Fbar to set edge stiffness to 0
+    if Fbar_inv is None:
+        Fbar_inv = np.linalg.pinv(Fbar_mat(fw))
+    new_Fbar_inv = Fbar_inv.copy()
     edge_dict = get_edge_dict(fw)
+    i = edge_dict[edge]
+    new_Fbar_inv[i,i] = new_stiff
+    old_Kaabar_inv = Kaabar_inv_mat(fw, V, Fbar_inv)
+    new_Kaabar_inv = Kaabar_inv_mat(fw, V, new_Fbar_inv)
+    del_Kaabar_inv = new_Kaabar_inv - old_Kaabar_inv
 
-    # modifying the framework to change two bonds to ghost bonds (source and target)
+    for i, a in enumerate(V):
+        ca = a.reshape(-1,1)
+        for j, ap in enumerate(V):
+            cap = ap.reshape(-1,1)
+            change += ca @ (del_Kaabar_inv[i,j] * cap.T) @ tensions
+    return change
+
+# perform one step of the algorithm
+def GF_one_step(fw, source, target, tension=1, nstars=[1.0]):
+    # establishing source and target
+    fw.add_edges_from([source, target])
+    fw = add_lengths(fw)
+    edge_dict = get_edge_dict(fw)
     fw.edges[source]["lam"] = 0
     fw.edges[target]["lam"] = 0
-    tensions = [0]*len(fw.edges)
-    tensions[edge_dict[source]] = tension
-    # starting_exts = extensions(fw, tensions)
-    # TESTING using gf extensions to start
+
+    source_i, target_i = edge_dict[source], edge_dict[target]
+    # tension on source bond
+    tensions = np.zeros(len(fw.edges))
+    tensions[source_i] = 1
+
+    SSS, SCS = subbases(fw)
+    V = V_basis(fw, rem_edges=None, SCS=SCS)
+    starting_exts = calc_starting_exts(fw, tensions, V)
+
+    # for each edge, calculate the change in extensions
+    k = fw.graph["k"]
     Fhalf = Fhalf_mat(fw)
-    starting_exts = G_f(fw) @ tensions
-    starting_strs = strains(fw, None, Fhalf @ starting_exts)
-    # strains = exts_to_strains(fw, extensions(fw, tensions, debug=True))
-    if verbose:
-        print("initial strain ratio:",starting_strs[edge_dict[target]]/starting_strs[edge_dict[source]])
-    if draw:
-        draw_strains(fw, starting_strs, source, target, ghost=True)
+    cost_list = []
+    nstars = [1.0]
+    old_Fbar_inv = np.linalg.pinv(Fbar_mat(fw))
+    for i, edge in enumerate(fw.edges):
+        # we ignore ghost edges as we can't double-remove them
+        if fw.edges[edge]["lam"] == 0:
+            cost_list.append(np.inf)
+        else:
+            change = change_in_exts(fw, edge, tensions, SCS)
+            
+            if fw.edges[edge]["lam"] == 0:
+                print("LAM 0 CHANGE:",change)
+            # combine change with starting extensions
+            new_exts = starting_exts + change
 
-    # calculating ns test
-    it = 0
-    min_cost = np.inf
-    while min_cost > cost_thresh and it < 1:#it_thresh:
-        costs = []
-        edge_to_remove = None
-
-        _, SCS = subbases(fw)
-        for edge in fw.edges:
-            # calculate new extensions
-            del_exts = change_in_ext(fw, edge, tensions, SCS=SCS)
-            new_exts = starting_exts + del_exts
             new_strs = strains(fw, None, Fhalf @ new_exts)
 
-            # calculate cost ratio for that edge
-            ns = [new_strs[edge_dict[target]] / new_strs[edge_dict[source]]]
+            # print(new_strs[target_i], new_strs[source_i])
+            ns = [new_strs[target_i] / new_strs[source_i]]
             cost = cost_f(ns, nstars)
-            print("edge, cost:", edge, cost)
-            if cost < min_cost:
-                min_cost = cost
-                edge_to_remove = edge
-        print("min cost, edge",min_cost, edge) 
 
-#         exts_list = all_extensions(fw, tensions, Hbar, Hbar_inv)
-#         for i, exts in enumerate(exts_list):
-#             if exts is None:
-#                 costs.append(np.inf)
-#             else:
-#                 strs = exts_to_strains(fw, exts)
-#                 ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
-#                 costs.append(cost_f(ns, nstars))
-#         min_cost = min(costs)
-#         index_to_remove = costs.index(min_cost)
-#         edge_to_remove = list(fw.edges)[index_to_remove]
-#         # update Hinv with the edge chosen
-#         Hbar, Hbar_inv = check_update_Hinv(fw, edge_to_remove,Hbar, Hbar_inv)
-#         # ok_(np.allclose(Hbar, Hbar @ Hbar_inv @ Hbar))
+            cost_list.append(cost)
 
-#         fw.edges[edge_to_remove]["lam"] = 0
-#         # test to see numerical error
-#         true_cost = calc_true_cost(fw, source, target, nstars, tension)
+    # making sure the edge doesn't introduce a zero mode
+    edge_passed = False
+    while not edge_passed:
+        min_cost = min(cost_list)
+        index_to_remove = cost_list.index(min_cost)
+        edge_to_remove = list(fw.edges)[index_to_remove]
+        # NOTE: checking if introduces a zero mode
+        Si = calc_Si(fw, edge_to_remove)
+        Si_sq = np.inner(Si, Si)
+        if np.isclose(Si_sq, 0):
+            cost_list[index_to_remove] = np.inf
+            print("ZERO MODE INTRODUCED:", edge_to_remove)
+        else:
+            edge_passed = True
+    fw.remove_edges_from([edge_to_remove])
 
-#         if verbose:
-#             print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
-#             print("true cost:",true_cost)
-#             print("relative percentage error:",100*abs(true_cost - min_cost) / true_cost)
-        it+=1
+    true_cost = calc_true_cost(fw, source, target, nstars, tension=1)
+    print("min cost, true cost:", min_cost, true_cost)
+    print("medge:", edge_to_remove)
+    return fw, min_cost, edge_to_remove
 
-    return fw
 
 
 # ============================================================================== 
