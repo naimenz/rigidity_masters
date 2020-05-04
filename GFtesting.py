@@ -23,5 +23,11 @@ fw = make_nice_fw(50,1)
 source = (39,40)
 target = (31,42)
 
-fwc = SM_tune_network(fw, source, target) 
-fw = GF_tune_network(fw, source, target)
+SSS, SCS = subbases(fw)
+tension = SSS[0]+SSS[1]+SCS[1]
+V = V_basis(fw, None, SCS)
+
+print(calc_starting_exts(fw,tension, V))
+
+# fwc = SM_tune_network(fw, source, target) 
+# fw = GF_tune_network(fw, source, target)

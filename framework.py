@@ -555,19 +555,22 @@ def calc_affine_span_dim(vectors):
 
 # takes a normal (non constricted, i.e. not embedded in lower dimensions) d-space framework
 # and returns True if it is inf. rigid, False otherwise
-def is_inf_rigid(fw, d):
+def is_inf_rigid(fw, d=2):
     size_V = len(fw)
-    nodeview = fw.nodes
-    vs = np.array([nodeview[node]["position"] for node in nodeview])
-    aspan_dim = calc_affine_span_dim(vs) 
+    # if it has no edges, can't be rigid
+    if len(fw.edges) < 1 and size_V > 1:
+        return False
+    # nodeview = fw.nodes
+    # vs = np.array([nodeview[node]["position"] for node in nodeview])
+    # aspan_dim = calc_affine_span_dim(vs) 
     # print(aspan_dim)
     
     # if aspan_dim < min(size_V - 1, d):
     #     return False
 
     # else:
-    R = create_augmented_rigidity_matrix(fw, d)
-    # R = rig_mat(fw, d)
+    # R = create_augmented_rigidity_matrix(fw, d)
+    R = rig_mat(fw, d)
     # print("d=",d," - ",np.linalg.matrix_rank(R) ,  d*size_V - (((d+1) * d) / 2))
     return np.linalg.matrix_rank(R) == d*size_V - (((d+1) * d) / 2)
 
@@ -743,7 +746,24 @@ def calc_Si(fw, edge, SSS=None):
     Si = np.zeros(len(fw.edges))
     for s in SSS:
         Si += np.outer(s,s) @ edge_vec
+    return Si
 
+# unique SSS bond modeled after calc_true_cost, i.e. remove ghost edges
+def calc_true_Si(fw_orig, edge):
+    fw = fw_orig.copy()
+    rem_edges = []
+    for edge in fw.edges:
+        if fw.edges[edge]["lam"] == 0:
+            rem_edges.append(edge)
+    fw.remove_edges_from(rem_edges)
+    SSS, _ = subbases(fw)
+    edge_dict = get_edge_dict(fw)
+    index = edge_dict[edge]
+    edge_vec = np.zeros(len(fw.edges))
+    edge_vec[index] = 1
+    Si = np.zeros(len(fw.edges))
+    for s in SSS:
+        Si += np.outer(s,s) @ edge_vec
     return Si
 
 # Code for gram_schmidt modified to allow a starting basis from:
@@ -1089,6 +1109,8 @@ def BF_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
     it = 0
     min_cost = np.inf
     while np.sqrt(min_cost) > cost_thresh and it < it_thresh:
+        if verbose:
+            print("\n=========== BF TUNING ITERATION",str(it + 1),"============")
         costs = []
         exts_list = all_extensions(fw, tensions)
         for i, exts in enumerate(exts_list):
@@ -1098,15 +1120,30 @@ def BF_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
                 strs = exts_to_strains(fw, exts)
                 ns = [strs[edge_dict[target]] / strs[edge_dict[source]]]
                 costs.append(cost_f(ns, nstars))
-        min_cost = min(costs)
-        index_to_remove = costs.index(min_cost)
-        edge_to_remove = list(fw.edges)[index_to_remove]
+        # making sure the edge doesn't introduce a zero mode
+        edge_passed = False
+        while not edge_passed:
+            smalls = sorted(costs)[:10]
+            smalls_edges = [list(fw.edges)[costs.index(x)] for x in smalls]
+            print("10 smallest costs:", smalls)
+            print("10 smallest cost edges (ordered):", smalls_edges)
+            min_cost = min(costs)
+            index_to_remove = costs.index(min_cost)
+            edge_to_remove = list(fw.edges)[index_to_remove]
+            # NOTE: checking if introduces a zero mode
+            Si = calc_true_Si(fw, edge_to_remove)
+            Si_sq = np.inner(Si, Si)
+            if np.isclose(Si_sq, 0):
+                costs[index_to_remove] = np.inf
+                print("ZERO MODE INTRODUCED:", edge_to_remove)
+            else:
+                edge_passed = True
+
         fw.edges[edge_to_remove]["lam"] = 0
         # test to see numerical error
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
         if verbose:
-            print("=========== BF TUNING ITERATION",str(it + 1),"============")
             # print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
             print("cost:",min_cost,"removed:",edge_to_remove)
             print("true cost:",true_cost)
@@ -1146,6 +1183,8 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
     H = H_mat(fw)
     H_inv = Hinv_mat(fw)
     while np.sqrt(min_cost) > cost_thresh and it < it_thresh:
+        if verbose:
+            print("\n=========== SM TUNING ITERATION",str(it + 1),"============")
         # starting H inverse
         # NOTE: recalculating before each edge removal
         H = H_mat(fw)
@@ -1170,7 +1209,7 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
             index_to_remove = costs.index(min_cost)
             edge_to_remove = list(fw.edges)[index_to_remove]
             # NOTE: checking if introduces a zero mode
-            Si = calc_Si(fw, edge_to_remove)
+            Si = calc_true_Si(fw, edge_to_remove)
             Si_sq = np.inner(Si, Si)
             if np.isclose(Si_sq, 0):
                 costs[index_to_remove] = np.inf
@@ -1187,7 +1226,6 @@ def SM_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
         true_cost = calc_true_cost(fw, source, target, nstars, tension)
 
         if verbose:
-            print("=========== SM TUNING ITERATION",str(it + 1),"============")
             # print("iteration:",it,"cost:",min_cost,"removed:",edge_to_remove)
             print("cost:",min_cost,"removed:",edge_to_remove)
             print("true cost:",true_cost)
@@ -1294,7 +1332,7 @@ def GF_one_step(fw, source, target, tension=1, nstars=[1.0]):
         index_to_remove = cost_list.index(min_cost)
         edge_to_remove = list(fw.edges)[index_to_remove]
         # NOTE: checking if introduces a zero mode
-        Si = calc_Si(fw, edge_to_remove)
+        Si = calc_true_Si(fw, edge_to_remove)
         Si_sq = np.inner(Si, Si)
         if np.isclose(Si_sq, 0):
             cost_list[index_to_remove] = np.inf
@@ -1325,8 +1363,8 @@ def GF_tune_network(fw_orig, source, target, tension=1, nstars=[1.0], cost_thres
     removed_edges = []
     it = 1
     while np.sqrt(min_cost) > cost_thresh and it < it_thresh:
-        print("============== GF TUNING ITERATION",it, "===============")
-        fw, min_cost, true_cost, edge_to_remove = GF_one_step(fw, source, target, 1, nstars)
+        print("\n============== GF TUNING ITERATION",it, "===============")
+        fw, min_cost, true_cost, edge_to_remove = GF_one_step(fw, source, target, tension=1, nstars=nstars)
         removed_edges.append(edge_to_remove)
         print("cost:",min_cost,"removed:",edge_to_remove)
         print("true cost:",true_cost)
@@ -1395,7 +1433,7 @@ def update_pos(fw, u):
 
     return fwc
 
-# # getting the max strain on the source edge
+# animate the strain on the network and save to a folder, plus log the graph and displacements
 def animate(fw, source, target, nstars, fileroot=None, s_max=1, tensions=1):
     # NOTE: ALWAYS SAVING IMAGE
     if fileroot is None:

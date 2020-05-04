@@ -23,7 +23,7 @@ blue = np.array([0,0,255])
 ys, xs = np.array(np.where(np.all(im == np.array(blue), axis=-1)))
 ys = 1000 - ys
 
-positions = np.array([xs, ys]).T
+positions = np.array([xs/1000, ys/1000]).T
 # np.savetxt("nodes.csv",positions,delimiter=",")
 
 nodes = list(range(len(positions)))
